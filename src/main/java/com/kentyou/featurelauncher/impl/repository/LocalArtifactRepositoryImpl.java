@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2012 - 2024 Data In Motion and others.
+ * Copyright (c) 2024 Kentyou and others.
  * All rights reserved. 
  * 
  * This program and the accompanying materials are made
@@ -9,10 +9,11 @@
  * SPDX-License-Identifier: EPL-2.0
  * 
  * Contributors:
- *     Data In Motion - initial API and implementation
+ *     Kentyou - initial implementation
  */
 package com.kentyou.featurelauncher.impl.repository;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
@@ -74,12 +75,18 @@ class LocalArtifactRepositoryImpl implements ArtifactRepository {
 
 		Path path = getArtifactM2RepoPath(id);
 
-		try {
-			return new FileInputStream(path.toFile());
-		} catch (FileNotFoundException e) {
-			LOG.error(String.format("Error getting artifact ID '%s'", id.toString()), e);
+		File file = path.toFile();
 
-			throw new RuntimeException(e); // TODO: clarify with Tim
+		if (file.exists()) {
+			try {
+				return new FileInputStream(file);
+			} catch (FileNotFoundException e) {
+				LOG.error(String.format("Error getting artifact ID '%s'", id.toString()), e);
+				throw new RuntimeException(e); // TODO: clarify with Tim regarding exception thrown
+			}
+		} else {
+			LOG.warn(String.format("Artifact ID '%s' does not exist in this repository!", id.toString()));
+			return null;
 		}
 	}
 

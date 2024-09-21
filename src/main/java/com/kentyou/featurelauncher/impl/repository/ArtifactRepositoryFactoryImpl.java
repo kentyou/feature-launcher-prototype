@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2012 - 2024 Data In Motion and others.
+ * Copyright (c) 2024 Kentyou and others.
  * All rights reserved. 
  * 
  * This program and the accompanying materials are made
@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  * 
  * Contributors:
- *     Data In Motion - initial API and implementation
+ *     Kentyou - initial implementation
  */
 package com.kentyou.featurelauncher.impl.repository;
 

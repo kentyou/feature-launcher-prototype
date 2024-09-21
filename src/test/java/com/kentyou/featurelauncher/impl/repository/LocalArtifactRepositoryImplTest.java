@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2012 - 2024 Data In Motion and others.
+ * Copyright (c) 2024 Kentyou and others.
  * All rights reserved. 
  * 
  * This program and the accompanying materials are made
@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  * 
  * Contributors:
- *     Data In Motion - initial API and implementation
+ *     Kentyou - initial implementation
  */
 package com.kentyou.featurelauncher.impl.repository;
 
@@ -19,16 +19,16 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.UUID;
+import java.util.jar.Attributes;
+import java.util.jar.JarInputStream;
+import java.util.jar.Manifest;
 
 import org.apache.felix.feature.impl.IDImpl;
 import org.junit.Before;
@@ -42,14 +42,26 @@ import org.osgi.service.featurelauncher.repository.ArtifactRepository;
  * and
  * {@link com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryFactoryImpl}
  * 
+ * As defined in: "160.2.1.2 Local Repositories"
+ * 
  * @author Michael H. Siemaszko (mhs@into.software)
  * @since Sep 17, 2024
  */
 public class LocalArtifactRepositoryImplTest {
+	private static final String M2_REPO_PROP_KEY = "M2_REPO_PATH"; // TODO: move to common constants
+
 	FeatureLauncher featureLauncher;
+	Path localM2RepositoryPath;
 
 	@Before
 	public void setUp() {
+		// Obtain path of dedicated M2 repo
+		if (System.getProperty(M2_REPO_PROP_KEY) == null) {
+			throw new IllegalStateException("M2 repository is not defined!");
+		}
+
+		localM2RepositoryPath = Paths.get(System.getProperty(M2_REPO_PROP_KEY));
+
 		// Load the Feature Launcher
 		ServiceLoader<FeatureLauncher> loader = ServiceLoader.load(FeatureLauncher.class);
 		Optional<FeatureLauncher> featureLauncherOptional = loader.findFirst();
@@ -63,10 +75,6 @@ public class LocalArtifactRepositoryImplTest {
 
 	@Test
 	public void testCreateLocalArtifactRepository() throws IOException {
-		File userHome = new File(System.getProperty("user.home"));
-
-		Path localM2RepositoryPath = Paths.get(userHome.getCanonicalPath(), ".m2", "repository");
-
 		ArtifactRepository localArtifactRepository = featureLauncher.createRepository(localM2RepositoryPath);
 
 		assertNotNull(localArtifactRepository);
@@ -96,10 +104,6 @@ public class LocalArtifactRepositoryImplTest {
 
 	@Test
 	public void testGetArtifactFromLocalArtifactRepository() throws IOException {
-		File userHome = new File(System.getProperty("user.home"));
-
-		Path localM2RepositoryPath = Paths.get(userHome.getCanonicalPath(), ".m2", "repository");
-
 		ArtifactRepository localArtifactRepository = featureLauncher.createRepository(localM2RepositoryPath);
 
 		assertNotNull(localArtifactRepository);
@@ -108,16 +112,13 @@ public class LocalArtifactRepositoryImplTest {
 		IDImpl artifactId = IDImpl.fromMavenID("org.osgi:org.osgi.service.feature:1.0.0");
 		assertNotNull(artifactId);
 
-		try (InputStream is = localArtifactRepository.getArtifact(artifactId)) {
+		try (JarInputStream jarIs = new JarInputStream(localArtifactRepository.getArtifact(artifactId))) {
+			Manifest jarMf = jarIs.getManifest();
+			assertTrue(jarMf != null);
 
-			File tmpFile = File.createTempFile("artifactFromLocalArtifactRepositoryTest", "tmp");
-			tmpFile.deleteOnExit();
-
-			try (OutputStream tmpFileOutputStream = new FileOutputStream(tmpFile)) {
-				tmpFileOutputStream.write(is.readAllBytes());
-
-				assertEquals(37779, tmpFile.length());
-			}
+			Attributes jarAttributes = jarMf.getMainAttributes();
+			assertTrue(jarAttributes != null);
+			assertEquals("org.osgi.service.feature", jarAttributes.getValue("Bundle-SymbolicName"));
 		}
 	}
 }

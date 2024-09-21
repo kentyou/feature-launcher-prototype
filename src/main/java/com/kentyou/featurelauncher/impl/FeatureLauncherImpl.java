@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2012 - 2024 Data In Motion and others.
+ * Copyright (c) 2024 Kentyou and others.
  * All rights reserved. 
  * 
  * This program and the accompanying materials are made
@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  * 
  * Contributors:
- *     Data In Motion - initial API and implementation
+ *     Kentyou - initial implementation
  */
 package com.kentyou.featurelauncher.impl;
 
@@ -95,7 +95,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 		private final Feature feature;
 		private boolean isLaunched;
 		private List<Bundle> installedBundles;
-		private ArtifactRepository artifactRepository;
+		private List<ArtifactRepository> artifactRepositories;
 		private Map<String, Object> configuration;
 		private Map<String, Object> variables;
 		private Map<String, Object> frameworkProps;
@@ -108,6 +108,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			this.feature = feature;
 			this.isLaunched = false;
 			this.installedBundles = new ArrayList<>();
+			this.artifactRepositories = new ArrayList<>();
 			this.configuration = new HashMap<>();
 			this.variables = new HashMap<>();
 			this.frameworkProps = new HashMap<>();
@@ -125,7 +126,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 
 			ensureNotLaunchedYet();
 
-			this.artifactRepository = repository;
+			this.artifactRepositories.add(repository);
 
 			return this;
 		}
@@ -213,7 +214,11 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 		@Override
 		public Framework launchFramework() {
 			Objects.requireNonNull(feature, "Feature is required!");
-			Objects.requireNonNull(artifactRepository, "Artifact Repository is required!");
+
+			if (this.artifactRepositories.isEmpty()) {
+				LOG.error("At least one Artifact Repository is required!");
+				throw new NullPointerException("At least one Artifact Repository is required!");
+			}
 
 			ensureNotLaunchedYet();
 
@@ -229,10 +234,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 
 			///////////////////////////////////////////
 			// 160.4.3.3: Creating a Framework instance
-
 			Framework framework = createFramework(frameworkFactory, Collections.emptyMap());
-
-			addLogListeners(framework);
 
 			/////////////////////////////////////////////////////////
 			// 160.4.3.4: Installing bundles and configurations
@@ -253,6 +255,9 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			Framework framework = frameworkFactory.newFramework(frameworkProperties);
 			try {
 				framework.init();
+
+				addLogListeners(framework);
+
 			} catch (BundleException e) {
 				LOG.error("Could not initialize framework!", e);
 				throw new LaunchException("Could not initialize framework!", e);
@@ -313,18 +318,30 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 		private void installBundle(Framework framework, FeatureBundle featureBundle) {
 			ID featureBundleID = featureBundle.getID();
 
-			try (InputStream featureBundleIs = artifactRepository.getArtifact(featureBundleID)) {
-				Bundle installedBundle = framework.getBundleContext().installBundle(featureBundleID.toString(),
-						featureBundleIs);
-				installedBundles.add(installedBundle);
+			try (InputStream featureBundleIs = getArtifact(featureBundleID)) {
+				if (featureBundleIs.available() != 0) {
+					Bundle installedBundle = framework.getBundleContext().installBundle(featureBundleID.toString(),
+							featureBundleIs);
+					installedBundles.add(installedBundle);
 
-				LOG.info(String.format("Installed bundle '%s'", installedBundle.getSymbolicName()));
-
+					LOG.info(String.format("Installed bundle '%s'", installedBundle.getSymbolicName()));
+				}
 			} catch (IOException | BundleException e) {
 				LOG.error(String.format("Could not install bundle '%s'!", featureBundleID.toString()), e);
 				throw new LaunchException(String.format("Could not install bundle '%s'!", featureBundleID.toString()),
 						e);
 			}
+		}
+
+		private InputStream getArtifact(ID featureBundleID) {
+			for (ArtifactRepository artifactRepository : artifactRepositories) {
+				InputStream featureBundleIs = artifactRepository.getArtifact(featureBundleID);
+				if (featureBundleIs != null) {
+					return featureBundleIs;
+				}
+			}
+
+			return InputStream.nullInputStream();
 		}
 
 		private void logFrameworkEvent(FrameworkEvent frameworkEvent) {

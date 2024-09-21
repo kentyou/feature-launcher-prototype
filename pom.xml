@@ -22,6 +22,7 @@
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<maven.compiler.release>17</maven.compiler.release>
+		<m2RepoPath>${project.build.directory}/m2Repo</m2RepoPath>
 	</properties>
 
 	<dependencyManagement>
@@ -78,17 +79,17 @@
 			<artifactId>org.apache.felix.feature</artifactId>
 			<version>1.0.2</version>
 		</dependency>
-	    <dependency>
-	      <groupId>org.slf4j</groupId>
-	      <artifactId>slf4j-api</artifactId>
-	      <version>2.0.9</version>
-	    </dependency>
-	    <dependency>
-	      <groupId>org.slf4j</groupId>
-	      <artifactId>slf4j-simple</artifactId>
-	      <version>2.0.9</version>
-	    </dependency>
-		
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+			<version>2.0.9</version>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-simple</artifactId>
+			<version>2.0.9</version>
+		</dependency>
+
 		<!-- Testing -->
 		<dependency>
 			<groupId>junit</groupId>
@@ -108,21 +109,21 @@
 			<version>1.2.19</version>
 			<classifier>jakarta</classifier>
 			<scope>test</scope>
-		</dependency>		
+		</dependency>
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
 			<artifactId>junit-jupiter-api</artifactId>
 			<scope>test</scope>
 		</dependency>
-		
+
 		<!-- default OSGi framework -->
 		<dependency>
-		    <groupId>org.apache.felix</groupId>
-		    <artifactId>org.apache.felix.framework</artifactId>
-		    <version>7.0.5</version>
-		    <scope>test</scope>
+			<groupId>org.apache.felix</groupId>
+			<artifactId>org.apache.felix.framework</artifactId>
+			<version>7.0.5</version>
+			<scope>test</scope>
 		</dependency>
-		
+
 		<!-- ensure "gogo console feature" bundles are present in local repo -->
 		<dependency>
 			<groupId>org.apache.felix</groupId>
@@ -220,6 +221,53 @@
 						<manifestFile>
 							${project.build.outputDirectory}/META-INF/MANIFEST.MF</manifestFile>
 					</archive>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-dependency-plugin</artifactId>
+				<version>3.8.0</version>
+				<executions>
+					<execution>
+						<id>copy-dependencies</id>
+						<phase>generate-test-resources</phase>
+						<goals>
+							<goal>copy-dependencies</goal>
+						</goals>
+						<configuration>
+							<outputDirectory>${m2RepoPath}</outputDirectory>
+							<useRepositoryLayout>true</useRepositoryLayout>
+							<copyPom>true</copyPom>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>properties-maven-plugin</artifactId>
+				<version>1.2.1</version>
+				<executions>
+					<execution>
+						<goals>
+							<goal>set-system-properties</goal>
+						</goals>
+						<configuration>
+							<properties>
+								<property>
+									<name>M2_REPO_PATH</name>
+									<value>${m2RepoPath}</value>
+								</property>
+							</properties>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<!-- needed to make system properties set via 'properties-maven-plugin' available in Java code -->
+					<forkCount>0</forkCount>
 				</configuration>
 			</plugin>
 		</plugins>
