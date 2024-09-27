@@ -34,7 +34,8 @@ import org.slf4j.LoggerFactory;
  * @author Michael H. Siemaszko (mhs@into.software)
  * @since Sep 15, 2024
  */
-class LocalArtifactRepositoryImpl implements ArtifactRepository {
+// TODO: implement {@link org.osgi.service.featurelauncher.repository.ArtifactRepository} directly once missing methods are available on that interface
+class LocalArtifactRepositoryImpl implements EnhancedArtifactRepository {
 	private static final Logger LOG = LoggerFactory.getLogger(LocalArtifactRepositoryImpl.class);
 
 	private static final String DEFAULT_EXTENSION = "jar";
@@ -59,10 +60,10 @@ class LocalArtifactRepositoryImpl implements ArtifactRepository {
 			Map.entry("javadoc", DEFAULT_EXTENSION));
 	// @formatter:on
 
-	private final Path m2RepositoryPath;
+	private final Path localRepositoryPath;
 
-	LocalArtifactRepositoryImpl(Path m2RepositoryPath) {
-		this.m2RepositoryPath = m2RepositoryPath;
+	LocalArtifactRepositoryImpl(Path localRepositoryPath) {
+		this.localRepositoryPath = localRepositoryPath;
 	}
 
 	/* 
@@ -82,16 +83,27 @@ class LocalArtifactRepositoryImpl implements ArtifactRepository {
 				return new FileInputStream(file);
 			} catch (FileNotFoundException e) {
 				LOG.error(String.format("Error getting artifact ID '%s'", id.toString()), e);
-				throw new RuntimeException(e); // TODO: clarify with Tim regarding exception thrown
 			}
 		} else {
 			LOG.warn(String.format("Artifact ID '%s' does not exist in this repository!", id.toString()));
-			return null;
 		}
+
+		return null;
+	}
+	
+	/* 
+	 * (non-Javadoc)
+	 * @see com.kentyou.featurelauncher.impl.repository.EnhancedArtifactRepository#getArtifactPath(org.osgi.service.feature.ID)
+	 */
+	@Override
+	public Path getArtifactPath(ID id) {
+		Objects.requireNonNull(id, "ID cannot be null!");
+		
+		return getArtifactM2RepoPath(id);
 	}
 
 	private Path getArtifactM2RepoPath(ID id) {
-		Path projectHome = Paths.get(m2RepositoryPath.toAbsolutePath().toString(), id.getGroupId().replace('.', '/'));
+		Path projectHome = Paths.get(localRepositoryPath.toAbsolutePath().toString(), id.getGroupId().replace('.', '/'));
 
 		StringBuilder artifactName = new StringBuilder();
 		artifactName.append(id.getArtifactId());

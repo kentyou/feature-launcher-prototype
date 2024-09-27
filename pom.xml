@@ -22,7 +22,7 @@
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<maven.compiler.release>17</maven.compiler.release>
-		<m2RepoPath>${project.build.directory}/m2Repo</m2RepoPath>
+		<localRepositoryPath>${project.build.directory}/m2Repo</localRepositoryPath>
 	</properties>
 
 	<dependencyManagement>
@@ -70,6 +70,17 @@
 		</dependency>
 		<dependency>
 			<groupId>org.apache.felix</groupId>
+			<artifactId>org.apache.felix.configadmin</artifactId>
+			<version>1.9.26</version>
+		</dependency>
+		<dependency>
+			<groupId>org.osgi</groupId>
+			<artifactId>org.osgi.util.converter</artifactId>
+			<version>1.0.9</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.felix</groupId>
 			<artifactId>org.apache.felix.cm.json</artifactId>
 			<version>2.0.0</version>
 			<scope>provided</scope>
@@ -88,6 +99,27 @@
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-simple</artifactId>
 			<version>2.0.9</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.maven</groupId>
+			<artifactId>maven-resolver-provider</artifactId>
+			<version>4.0.0-beta-4</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.maven.resolver</groupId>
+			<artifactId>maven-resolver-supplier-mvn4</artifactId>
+			<version>2.0.1</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.maven.resolver</groupId>
+			<artifactId>maven-resolver-spi</artifactId>
+			<version>2.0.1</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.xeustechnologies</groupId>
+			<artifactId>jcl-core</artifactId>
+			<version>2.8</version>
 		</dependency>
 
 		<!-- Testing -->
@@ -124,7 +156,7 @@
 			<scope>test</scope>
 		</dependency>
 
-		<!-- ensure "gogo console feature" bundles are present in local repo -->
+		<!-- ensure feature bundles are present in local repo -->
 		<dependency>
 			<groupId>org.apache.felix</groupId>
 			<artifactId>org.apache.felix.gogo.command</artifactId>
@@ -141,6 +173,24 @@
 			<groupId>org.apache.felix</groupId>
 			<artifactId>org.apache.felix.gogo.runtime</artifactId>
 			<version>1.1.6</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>biz.aQute</groupId>
+			<artifactId>biz.aQute.gogo.commands.provider</artifactId>
+			<version>1.9.0</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>biz.aQute.bnd</groupId>
+			<artifactId>biz.aQute.bnd.util</artifactId>
+			<version>7.0.0</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.aries.spifly</groupId>
+			<artifactId>org.apache.aries.spifly.dynamic.framework.extension</artifactId>
+			<version>1.3.6</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
@@ -235,7 +285,7 @@
 							<goal>copy-dependencies</goal>
 						</goals>
 						<configuration>
-							<outputDirectory>${m2RepoPath}</outputDirectory>
+							<outputDirectory>${localRepositoryPath}</outputDirectory>
 							<useRepositoryLayout>true</useRepositoryLayout>
 							<copyPom>true</copyPom>
 						</configuration>
@@ -254,8 +304,8 @@
 						<configuration>
 							<properties>
 								<property>
-									<name>M2_REPO_PATH</name>
-									<value>${m2RepoPath}</value>
+									<name>localRepositoryPath</name>
+									<value>${localRepositoryPath}</value>
 								</property>
 							</properties>
 						</configuration>
@@ -266,7 +316,8 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
 				<configuration>
-					<!-- needed to make system properties set via 'properties-maven-plugin' available in Java code -->
+					<!-- needed to make system properties set via
+					'properties-maven-plugin' available in Java code -->
 					<forkCount>0</forkCount>
 				</configuration>
 			</plugin>

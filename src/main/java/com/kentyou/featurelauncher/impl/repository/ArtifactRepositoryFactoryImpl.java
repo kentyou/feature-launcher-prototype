@@ -13,8 +13,12 @@
  */
 package com.kentyou.featurelauncher.impl.repository;
 
+import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.LOCAL_ARTIFACT_REPOSITORY_PATH;
+import static org.osgi.service.featurelauncher.FeatureLauncherConstants.REMOTE_ARTIFACT_REPOSITORY_NAME;
+
 import java.net.URI;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Objects;
 
@@ -40,15 +44,7 @@ public class ArtifactRepositoryFactoryImpl implements ArtifactRepositoryFactory 
 	public ArtifactRepository createRepository(Path path) {
 		Objects.requireNonNull(path, "Path cannot be null!");
 
-		if (!path.toFile().exists()) {
-			LOG.error(String.format("Path '%s' does not exist!", path.toString()));
-			throw new IllegalArgumentException(String.format("Path '%s' does not exist!", path.toString()));
-		}
-
-		if (!path.toFile().isDirectory()) {
-			LOG.error(String.format("Path '%s' is not a directory!", path.toString()));
-			throw new IllegalArgumentException(String.format("Path '%s' is not a directory!", path.toString()));
-		}
+		validateLocalRepositoryPath(path);
 
 		return new LocalArtifactRepositoryImpl(path);
 	}
@@ -58,8 +54,33 @@ public class ArtifactRepositoryFactoryImpl implements ArtifactRepositoryFactory 
 	 * @see org.osgi.service.featurelauncher.repository.ArtifactRepositoryFactory#createRepository(java.net.URI, java.util.Map)
 	 */
 	@Override
-	public ArtifactRepository createRepository(URI uri, Map<String, Object> props) {
-		// TODO Auto-generated method stub
-		return null;
+	public ArtifactRepository createRepository(URI uri, Map<String, Object> configurationProperties) {
+		Objects.requireNonNull(uri, "URI cannot be null!");
+		Objects.requireNonNull(configurationProperties, "Configuration properties cannot be null!");
+
+		if (configurationProperties.isEmpty()) {
+			throw new NullPointerException("Configuration properties cannot be empty!");
+		} else if (!configurationProperties.containsKey(REMOTE_ARTIFACT_REPOSITORY_NAME)) {
+			throw new NullPointerException("Remote repository name is required!");
+		} else if (!configurationProperties.containsKey(LOCAL_ARTIFACT_REPOSITORY_PATH)) {
+			throw new NullPointerException("Local repository path is required!");
+		}
+
+		validateLocalRepositoryPath(Paths
+				.get(String.valueOf(configurationProperties.get(LOCAL_ARTIFACT_REPOSITORY_PATH))));
+
+		return new RemoteArtifactRepositoryImpl(uri, configurationProperties);
+	}
+
+	private void validateLocalRepositoryPath(Path path) {
+		if (!path.toFile().exists()) {
+			LOG.error(String.format("Path '%s' does not exist!", path.toString()));
+			throw new IllegalArgumentException(String.format("Path '%s' does not exist!", path.toString()));
+		}
+
+		if (!path.toFile().isDirectory()) {
+			LOG.error(String.format("Path '%s' is not a directory!", path.toString()));
+			throw new IllegalArgumentException(String.format("Path '%s' is not a directory!", path.toString()));
+		}
 	}
 }
