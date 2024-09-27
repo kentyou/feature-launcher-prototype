@@ -251,7 +251,7 @@
 							<bnd><![CDATA[
                             Provide-Capability: \
                                 osgi.service;objectClass:List<String>="org.osgi.service.featurelauncher.runtime.FeatureRuntime";uses:="org.osgi.service.featurelauncher.runtime",\
-                                osgi.service;objectClass:List<String>="org.osgi.service.featurelauncher.repository.ArtifactRepositoryFactory";uses:="org.osgi.service.featurelauncher.repository"						
+                                osgi.service;objectClass:List<String>="org.osgi.service.featurelauncher.repository.ArtifactRepositoryFactory";uses:="org.osgi.service.featurelauncher.repository"
                             ]]></bnd>
 						</configuration>
 					</execution>
