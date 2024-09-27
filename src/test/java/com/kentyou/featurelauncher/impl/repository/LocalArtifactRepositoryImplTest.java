@@ -13,6 +13,7 @@
  */
 package com.kentyou.featurelauncher.impl.repository;
 
+import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.LOCAL_ARTIFACT_REPOSITORY_PATH;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -33,8 +34,8 @@ import java.util.jar.Manifest;
 import org.apache.felix.feature.impl.IDImpl;
 import org.junit.Before;
 import org.junit.Test;
-import org.osgi.service.featurelauncher.FeatureLauncher;
 import org.osgi.service.featurelauncher.repository.ArtifactRepository;
+import org.osgi.service.featurelauncher.repository.ArtifactRepositoryFactory;
 
 /**
  * Tests
@@ -48,34 +49,32 @@ import org.osgi.service.featurelauncher.repository.ArtifactRepository;
  * @since Sep 17, 2024
  */
 public class LocalArtifactRepositoryImplTest {
-	private static final String M2_REPO_PROP_KEY = "M2_REPO_PATH"; // TODO: move to common constants
-
-	FeatureLauncher featureLauncher;
+	ArtifactRepositoryFactory artifactRepositoryFactory;
 	Path localM2RepositoryPath;
 
 	@Before
 	public void setUp() {
-		// Obtain path of dedicated M2 repo
-		if (System.getProperty(M2_REPO_PROP_KEY) == null) {
-			throw new IllegalStateException("M2 repository is not defined!");
+		// Obtain path of dedicated local Maven repository
+		if (System.getProperty(LOCAL_ARTIFACT_REPOSITORY_PATH) == null) {
+			throw new IllegalStateException("Local Maven repository is not defined!");
 		}
 
-		localM2RepositoryPath = Paths.get(System.getProperty(M2_REPO_PROP_KEY));
+		localM2RepositoryPath = Paths.get(System.getProperty(LOCAL_ARTIFACT_REPOSITORY_PATH));
 
-		// Load the Feature Launcher
-		ServiceLoader<FeatureLauncher> loader = ServiceLoader.load(FeatureLauncher.class);
-		Optional<FeatureLauncher> featureLauncherOptional = loader.findFirst();
+		// Load the Artifact Repository Factory
+		ServiceLoader<ArtifactRepositoryFactory> loader = ServiceLoader.load(ArtifactRepositoryFactory.class);
+		Optional<ArtifactRepositoryFactory> artifactRepositoryFactoryOptional = loader.findFirst();
 
-		if (featureLauncherOptional.isPresent()) {
-			featureLauncher = featureLauncherOptional.get();
+		if (artifactRepositoryFactoryOptional.isPresent()) {
+			artifactRepositoryFactory = artifactRepositoryFactoryOptional.get();
 		} else {
-			throw new IllegalStateException("Error loading feature launcher!");
+			throw new IllegalStateException("Error loading artifact repository factory!");
 		}
 	}
 
 	@Test
 	public void testCreateLocalArtifactRepository() throws IOException {
-		ArtifactRepository localArtifactRepository = featureLauncher.createRepository(localM2RepositoryPath);
+		ArtifactRepository localArtifactRepository = artifactRepositoryFactory.createRepository(localM2RepositoryPath);
 
 		assertNotNull(localArtifactRepository);
 		assertTrue(localArtifactRepository instanceof LocalArtifactRepositoryImpl);
@@ -83,7 +82,7 @@ public class LocalArtifactRepositoryImplTest {
 
 	@Test
 	public void testCreateLocalArtifactRepositoryNullPath() {
-		assertThrows(NullPointerException.class, () -> featureLauncher.createRepository(null));
+		assertThrows(NullPointerException.class, () -> artifactRepositoryFactory.createRepository(null));
 	}
 
 	@Test
@@ -91,7 +90,8 @@ public class LocalArtifactRepositoryImplTest {
 		Path nonExistingRepositoryPath = Paths.get(FileSystems.getDefault().getSeparator(), "tmp",
 				UUID.randomUUID().toString());
 
-		assertThrows(IllegalArgumentException.class, () -> featureLauncher.createRepository(nonExistingRepositoryPath));
+		assertThrows(IllegalArgumentException.class,
+				() -> artifactRepositoryFactory.createRepository(nonExistingRepositoryPath));
 	}
 
 	@Test
@@ -99,12 +99,13 @@ public class LocalArtifactRepositoryImplTest {
 		File tmpFile = File.createTempFile("localArtifactRepositoryTest", "tmp");
 		tmpFile.deleteOnExit();
 
-		assertThrows(IllegalArgumentException.class, () -> featureLauncher.createRepository(tmpFile.toPath()));
+		assertThrows(IllegalArgumentException.class,
+				() -> artifactRepositoryFactory.createRepository(tmpFile.toPath()));
 	}
 
 	@Test
 	public void testGetArtifactFromLocalArtifactRepository() throws IOException {
-		ArtifactRepository localArtifactRepository = featureLauncher.createRepository(localM2RepositoryPath);
+		ArtifactRepository localArtifactRepository = artifactRepositoryFactory.createRepository(localM2RepositoryPath);
 
 		assertNotNull(localArtifactRepository);
 		assertTrue(localArtifactRepository instanceof LocalArtifactRepositoryImpl);

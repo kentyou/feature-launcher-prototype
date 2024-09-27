@@ -16,6 +16,12 @@ package com.kentyou.featurelauncher.impl;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
+import java.nio.file.FileVisitResult;
+import java.nio.file.FileVisitor;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -25,8 +31,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceLoader;
+import java.util.stream.Collectors;
 
 import org.osgi.framework.Bundle;
+import org.osgi.framework.BundleContext;
 import org.osgi.framework.BundleEvent;
 import org.osgi.framework.BundleException;
 import org.osgi.framework.Constants;
@@ -48,7 +56,6 @@ import org.slf4j.LoggerFactory;
 import com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryFactoryImpl;
 import com.kentyou.featurelauncher.impl.util.BundleEventUtil;
 import com.kentyou.featurelauncher.impl.util.FrameworkEventUtil;
-import com.kentyou.featurelauncher.impl.util.FrameworkFactoryLocator;
 
 /**
  * 160.4 The Feature Launcher
@@ -101,6 +108,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 		private Map<String, Object> frameworkProps;
 		private List<FeatureDecorator> decorators;
 		private Map<String, FeatureExtensionHandler> extensionHandlers;
+		private FeatureConfigurationManager featureConfigurationManager;
 
 		LaunchBuilderImpl(Feature feature) {
 			Objects.requireNonNull(feature, "Feature cannot be null!");
@@ -227,20 +235,21 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 
 			/////////////////////////////////////////////////
 			// 160.4.3.2: Locating a framework implementation
-
-			// use default framework implementation for now
-			FrameworkFactory frameworkFactory = FrameworkFactoryLocator.loadDefaultFrameworkFactory();
-			Objects.requireNonNull(frameworkFactory, "Framework Factory cannot be null!");
+			FrameworkFactory frameworkFactory = FrameworkFactoryLocator.locateFrameworkFactory(feature,
+					artifactRepositories);
 
 			///////////////////////////////////////////
 			// 160.4.3.3: Creating a Framework instance
-			Framework framework = createFramework(frameworkFactory, Collections.emptyMap());
+			Framework framework = createFramework(frameworkFactory, convertFrameworkProperties(frameworkProps));
 
 			/////////////////////////////////////////////////////////
 			// 160.4.3.4: Installing bundles and configurations
 			installBundles(framework);
 
-			// TODO: install configurations
+			// FIXME: configurations can only be installed once 'ConfigurationAdmin' service
+			// is available, and that is only once framework is started, so section
+			// "160.4.3.4" title ( "Installing bundles and configurations" ) is misleading
+			// ..
 
 			//////////////////////////////////////////
 			// 160.4.3.5: Starting the framework
@@ -293,6 +302,28 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 		private void startBundle(Bundle installedBundle) throws BundleException {
 			if (installedBundle.getHeaders().get(Constants.FRAGMENT_HOST) == null) {
 				installedBundle.start();
+
+				startConfigurationAdminTrackerIfNeeded(installedBundle.getBundleContext());
+			}
+		}
+
+		private void startConfigurationAdminTrackerIfNeeded(BundleContext bundleContext) {
+			if (featureConfigurationManager == null && !feature.getConfigurations().isEmpty()) {
+				featureConfigurationManager = new FeatureConfigurationManager(bundleContext,
+						feature.getConfigurations());
+				featureConfigurationManager.start();
+
+				LOG.info(String.format("Started ConfigurationAdmin service tracker for bundle '%s'",
+						bundleContext.getBundle().getSymbolicName()));
+			}
+		}
+
+		private void stopConfigurationAdminTracker() {
+			if (featureConfigurationManager != null) {
+				featureConfigurationManager.stop();
+				featureConfigurationManager = null;
+
+				LOG.info("Stopped ConfigurationAdmin service tracker");
 			}
 		}
 
@@ -366,14 +397,25 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 					Bundle installedBundle = installedBundlesIt.next();
 
 					try {
-						installedBundle.uninstall();
+						if (installedBundle.getState() != Bundle.UNINSTALLED) {
+							installedBundle.uninstall();
+							LOG.info(String.format("Uninstalled bundle '%s'", installedBundle.getSymbolicName()));
+						}
 
 						installedBundlesIt.remove();
 
-						LOG.info(String.format("Uninstalled bundle '%s'", installedBundle.getSymbolicName()));
 					} catch (BundleException exc) {
 						LOG.error(String.format("Cannot uninstall bundle '%s'", installedBundle.getSymbolicName()));
 					}
+				}
+			}
+
+			if (frameworkProps.containsKey(Constants.FRAMEWORK_STORAGE)) {
+				try {
+					deleteFrameworkStorageArea(
+							Paths.get(String.valueOf(frameworkProps.get(Constants.FRAMEWORK_STORAGE))));
+				} catch (IOException e) {
+					LOG.warn("Could not delete framework storage area!", e);
 				}
 			}
 		}
@@ -385,6 +427,8 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 					try {
 						if (framework != null) {
 							LOG.info("Stopping framework..");
+
+							stopConfigurationAdminTracker();
 
 							cleanup(framework);
 
@@ -403,6 +447,67 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 				LOG.error("Framework already launched!");
 				throw new IllegalStateException("Framework already launched!");
 			}
+		}
+
+		/**
+		 * FIXME: remove once conflict between
+		 * `org.osgi.service.featurelauncher.FeatureLauncher.LaunchBuilder.withFrameworkProperties(Map<String,
+		 * Object>)` and
+		 * `org.osgi.framework.launch.FrameworkFactory.newFramework(Map<String,
+		 * String>)` is resolved
+		 **/
+		private Map<String, String> convertFrameworkProperties(Map<String, Object> frameworkProperties) {
+			if (!frameworkProperties.isEmpty()) {
+				return frameworkProperties.entrySet().stream()
+						.collect(Collectors.toMap(Map.Entry::getKey, e -> String.valueOf(e.getValue())));
+			}
+
+			return Collections.emptyMap();
+		}
+
+		/**
+		 * Based on:
+		 * {@link aQute.bnd.test.jupiter.TemporaryDirectoryExtension.delete(Path)}
+		 **/
+		private static void deleteFrameworkStorageArea(Path path) throws IOException {
+			path = path.toAbsolutePath();
+			if (Files.notExists(path) && !Files.isSymbolicLink(path)) {
+				return;
+			}
+			if (path.equals(path.getRoot()))
+				throw new IllegalArgumentException("Cannot recursively delete root for safety reasons");
+
+			Files.walkFileTree(path, new FileVisitor<Path>() {
+				@Override
+				public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+					return FileVisitResult.CONTINUE;
+				}
+
+				@Override
+				public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+					Files.delete(file);
+					return FileVisitResult.CONTINUE;
+				}
+
+				@Override
+				public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+					try {
+						Files.delete(file);
+					} catch (IOException e) {
+						throw exc;
+					}
+					return FileVisitResult.CONTINUE;
+				}
+
+				@Override
+				public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+					if (exc != null) { // directory iteration failed
+						throw exc;
+					}
+					Files.delete(dir);
+					return FileVisitResult.CONTINUE;
+				}
+			});
 		}
 	}
 
