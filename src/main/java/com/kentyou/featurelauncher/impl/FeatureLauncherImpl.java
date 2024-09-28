@@ -65,6 +65,7 @@ import com.kentyou.featurelauncher.impl.util.FrameworkEventUtil;
  */
 public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implements FeatureLauncher {
 	private static final Logger LOG = LoggerFactory.getLogger(FeatureLauncherImpl.class);
+	static final String FRAMEWORK_STORAGE_CLEAN_TESTONLY = "testOnly";
 	
 	/* 
 	 * (non-Javadoc)
@@ -267,6 +268,12 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 
 				addLogListeners(framework);
 
+				// TIM: if ConfigurationAdmin service tracker is initialized and started using
+				// Framework's Bundle Context, it never becomes available - i.e. neither via
+				// `org.osgi.util.tracker.ServiceTracker.waitForService(long)` nor via
+				// `org.osgi.util.tracker.ServiceTrackerCustomizer#addingService(org.osgi.framework.ServiceReference)`
+//				startConfigurationAdminTrackerIfNeeded(framework.getBundleContext());
+
 			} catch (BundleException e) {
 				LOG.error("Could not initialize framework!", e);
 				throw new LaunchException("Could not initialize framework!", e);
@@ -283,7 +290,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 
 				createShutdownHook(framework);
 
-			} catch (BundleException e) {
+			} catch (BundleException | InterruptedException e) {
 				////////////////////////////////////
 				// 160.4.3.6: Cleanup after failure
 				cleanup(framework);
@@ -293,13 +300,13 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			}
 		}
 
-		private void startBundles() throws BundleException {
+		private void startBundles() throws BundleException, InterruptedException {
 			for (Bundle installedBundle : installedBundles) {
 				startBundle(installedBundle);
 			}
 		}
 
-		private void startBundle(Bundle installedBundle) throws BundleException {
+		private void startBundle(Bundle installedBundle) throws BundleException, InterruptedException {
 			if (installedBundle.getHeaders().get(Constants.FRAGMENT_HOST) == null) {
 				installedBundle.start();
 
@@ -307,7 +314,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			}
 		}
 
-		private void startConfigurationAdminTrackerIfNeeded(BundleContext bundleContext) {
+		private void startConfigurationAdminTrackerIfNeeded(BundleContext bundleContext) throws InterruptedException {
 			if (featureConfigurationManager == null && !feature.getConfigurations().isEmpty()) {
 				featureConfigurationManager = new FeatureConfigurationManager(bundleContext,
 						feature.getConfigurations());
@@ -391,6 +398,8 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 		}
 
 		private void cleanup(Framework framework) {
+			Collections.reverse(installedBundles);
+
 			if (!installedBundles.isEmpty()) {
 				Iterator<Bundle> installedBundlesIt = installedBundles.iterator();
 				while (installedBundlesIt.hasNext()) {
@@ -410,7 +419,9 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 				}
 			}
 
-			if (frameworkProps.containsKey(Constants.FRAMEWORK_STORAGE)) {
+			if (frameworkProps.containsKey(Constants.FRAMEWORK_STORAGE)
+					&& frameworkProps.containsKey(Constants.FRAMEWORK_STORAGE_CLEAN)
+					&& FRAMEWORK_STORAGE_CLEAN_TESTONLY.equals(frameworkProps.get(Constants.FRAMEWORK_STORAGE_CLEAN))) {
 				try {
 					deleteFrameworkStorageArea(
 							Paths.get(String.valueOf(frameworkProps.get(Constants.FRAMEWORK_STORAGE))));

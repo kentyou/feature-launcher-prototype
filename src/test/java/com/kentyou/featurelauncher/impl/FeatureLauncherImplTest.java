@@ -13,6 +13,7 @@
  */
 package com.kentyou.featurelauncher.impl;
 
+import static com.kentyou.featurelauncher.impl.FeatureLauncherImpl.FRAMEWORK_STORAGE_CLEAN_TESTONLY;
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.LOCAL_ARTIFACT_REPOSITORY_PATH;
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.REMOTE_ARTIFACT_REPOSITORY_URI;
 import static org.junit.Assert.assertEquals;
@@ -51,6 +52,7 @@ public class FeatureLauncherImplTest {
 	FeatureLauncher featureLauncher;
 	Path localM2RepositoryPath;
 	Map<String, Object> frameworkProperties;
+	Path frameworkStorageTempDir;
 
 	@Before
 	public void setUp() throws InterruptedException, IOException {
@@ -60,9 +62,11 @@ public class FeatureLauncherImplTest {
 		}
 
 		localM2RepositoryPath = Paths.get(System.getProperty(LOCAL_ARTIFACT_REPOSITORY_PATH));
-
+		
 		// Configure framwork properties
-		frameworkProperties = Map.of(Constants.FRAMEWORK_STORAGE, Files.createTempDirectory("osgi_"));
+		frameworkStorageTempDir = Files.createTempDirectory("osgi_");
+		frameworkProperties = Map.of(Constants.FRAMEWORK_STORAGE, frameworkStorageTempDir, 
+									 Constants.FRAMEWORK_STORAGE_CLEAN, FRAMEWORK_STORAGE_CLEAN_TESTONLY);
 
 		// Load the Feature Launcher
 		ServiceLoader<FeatureLauncher> loader = ServiceLoader.load(FeatureLauncher.class);
@@ -106,7 +110,7 @@ public class FeatureLauncherImplTest {
 		assertEquals("org.apache.felix.gogo.runtime", bundles[3].getSymbolicName());
 		assertEquals("ACTIVE", BundleStateUtil.getBundleStateString(bundles[3].getState()));
 
-//		// Stop framework
+		// Stop framework
 		osgiFramework.stop();
 		osgiFramework.waitForStop(0);
 	}

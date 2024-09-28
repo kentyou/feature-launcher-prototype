@@ -26,6 +26,7 @@ import org.osgi.framework.FrameworkUtil;
 import org.osgi.framework.ServiceReference;
 import org.osgi.service.cm.ConfigurationAdmin;
 import org.osgi.service.feature.FeatureConfiguration;
+import org.osgi.service.featurelauncher.LaunchException;
 import org.osgi.util.tracker.ServiceTracker;
 import org.osgi.util.tracker.ServiceTrackerCustomizer;
 import org.slf4j.Logger;
@@ -47,6 +48,7 @@ class FeatureConfigurationManager implements ServiceTrackerCustomizer<Configurat
 
 	private static final String CONFIGURATION_ADMIN_CLASS_NAME = "org.osgi.service.cm.ConfigurationAdmin";
 	private static final String CONFIGURATION_CLASS_NAME = "org.osgi.service.cm.Configuration";
+	private static final long CONFIGURATION_TIMEOUT_DEFAULT = 5000;
 
 	private final BundleContext bundleContext;
 	private final Map<String, FeatureConfiguration> featureConfigurations;
@@ -84,9 +86,14 @@ class FeatureConfigurationManager implements ServiceTrackerCustomizer<Configurat
 		}
 	}
 
-	public void start() {
+	public void start() throws InterruptedException {
 		serviceTracker = new ServiceTracker<>(this.bundleContext, ConfigurationAdmin.class, this);
 		serviceTracker.open();
+
+		if (serviceTracker.waitForService(CONFIGURATION_TIMEOUT_DEFAULT) == null) { // TODO: handle other special values
+																					// defined in 160.8.4.3
+			throw new LaunchException("'ConfigurationAdmin' service is not available!");
+		}
 	}
 
 	public void stop() {
