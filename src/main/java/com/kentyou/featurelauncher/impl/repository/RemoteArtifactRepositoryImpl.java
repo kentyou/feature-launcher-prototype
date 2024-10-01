@@ -20,8 +20,10 @@ import static org.osgi.service.featurelauncher.FeatureLauncherConstants.REMOTE_A
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
@@ -45,14 +47,15 @@ import org.osgi.service.feature.ID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.kentyou.featurelauncher.impl.util.FileSystemUtil;
+
 /**
  * 160.2.1.3 Remote Repositories
  * 
  * @author Michael H. Siemaszko (mhs@into.software)
  * @since Sep 15, 2024
  */
-// TODO: implement {@link org.osgi.service.featurelauncher.repository.ArtifactRepository} directly once missing methods are available on that interface
-class RemoteArtifactRepositoryImpl implements EnhancedArtifactRepository {
+class RemoteArtifactRepositoryImpl implements FileSystemArtifactRepository {
 	private static final Logger LOG = LoggerFactory.getLogger(RemoteArtifactRepositoryImpl.class);
 
 	private final URI repositoryURI;
@@ -63,8 +66,13 @@ class RemoteArtifactRepositoryImpl implements EnhancedArtifactRepository {
 	public RemoteArtifactRepositoryImpl(URI repositoryURI, Map<String, Object> configurationProperties) {
 		this.repositoryURI = repositoryURI;
 		this.configurationProperties = configurationProperties;
-		this.localRepositoryPath = Paths
-				.get(String.valueOf(configurationProperties.get(LOCAL_ARTIFACT_REPOSITORY_PATH)));
+
+		if (!configurationProperties.isEmpty() && configurationProperties.containsKey(LOCAL_ARTIFACT_REPOSITORY_PATH)) {
+			this.localRepositoryPath = Paths
+					.get(String.valueOf(configurationProperties.get(LOCAL_ARTIFACT_REPOSITORY_PATH)));
+		} else {
+			this.localRepositoryPath = createTemporaryLocalArtifactRepository();
+		}
 
 		// @formatter:off
 		this.remoteRepository = new RemoteRepository.Builder(
@@ -131,6 +139,15 @@ class RemoteArtifactRepositoryImpl implements EnhancedArtifactRepository {
 		return null;
 	}
 
+	/* 
+	 * (non-Javadoc)
+	 * @see com.kentyou.featurelauncher.impl.repository.FileSystemArtifactRepository#getLocalRepositoryPath()
+	 */
+	@Override
+	public Path getLocalRepositoryPath() {
+		return localRepositoryPath;
+	}
+
 	private RepositorySystem newRepositorySystem() {
 		return new RepositorySystemSupplier().get();
 	}
@@ -148,5 +165,31 @@ class RemoteArtifactRepositoryImpl implements EnhancedArtifactRepository {
 		sessionBuilder.setLocalRepositoryManager(localRepositoryManager);
 
 		return sessionBuilder.build();
+	}
+
+	private Path createTemporaryLocalArtifactRepository() {
+		try {
+			Path localRepositoryPath = Files.createTempDirectory("featurelauncherM2repo_");
+
+			deleteOnShutdown(localRepositoryPath);
+
+			return localRepositoryPath;
+
+		} catch (IOException e) {
+			throw new IllegalStateException("Could not create temporary local artifact repository!", e);
+		}
+	}
+
+	private void deleteOnShutdown(Path localRepositoryPath) {
+		Runtime.getRuntime().addShutdownHook(new Thread() {
+			@Override
+			public void run() {
+				try {
+					FileSystemUtil.recursivelyDelete(localRepositoryPath);
+				} catch (IOException e) {
+					LOG.warn("Could not delete temporary local artifact repository!");
+				}
+			}
+		});
 	}
 }

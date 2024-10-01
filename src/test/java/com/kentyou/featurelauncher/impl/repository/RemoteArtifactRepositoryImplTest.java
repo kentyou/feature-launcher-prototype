@@ -80,9 +80,17 @@ public class RemoteArtifactRepositoryImplTest {
 	public void testCreateRemoteArtifactRepository() throws IOException {
 		ArtifactRepository remoteRepository = artifactRepositoryFactory.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
 				Map.of(REMOTE_ARTIFACT_REPOSITORY_NAME, "central", LOCAL_ARTIFACT_REPOSITORY_PATH,
-						localM2RepositoryPath.toString())); // FIXME: This is missing from API as is currently - i.e.
-															// path to local repository is needed for remote repository as
-															// well
+						localM2RepositoryPath.toString())); // path to local repository is needed for remote repository
+															// as well
+
+		assertNotNull(remoteRepository);
+		assertTrue(remoteRepository instanceof RemoteArtifactRepositoryImpl);
+	}
+
+	@Test
+	public void testCreateRemoteArtifactRepositoryWithTemporaryLocalArtifactRepository() throws IOException {
+		ArtifactRepository remoteRepository = artifactRepositoryFactory.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
+				Map.of(REMOTE_ARTIFACT_REPOSITORY_NAME, "central"));
 
 		assertNotNull(remoteRepository);
 		assertTrue(remoteRepository instanceof RemoteArtifactRepositoryImpl);
@@ -111,12 +119,6 @@ public class RemoteArtifactRepositoryImplTest {
 		assertThrows(NullPointerException.class,
 				() -> artifactRepositoryFactory.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
 						Map.of(LOCAL_ARTIFACT_REPOSITORY_PATH, localM2RepositoryPath.toString())));
-	}
-
-	@Test
-	public void testCreateRemoteArtifactRepositoryNoLocalRepositoryPath() {
-		assertThrows(NullPointerException.class, () -> artifactRepositoryFactory
-				.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI, Map.of(REMOTE_ARTIFACT_REPOSITORY_NAME, "central")));
 	}
 
 	@Test

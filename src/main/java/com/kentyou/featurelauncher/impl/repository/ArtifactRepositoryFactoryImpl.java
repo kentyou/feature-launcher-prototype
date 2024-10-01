@@ -27,6 +27,8 @@ import org.osgi.service.featurelauncher.repository.ArtifactRepositoryFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.kentyou.featurelauncher.impl.util.FileSystemUtil;
+
 /**
  * 160.2.1 The Artifact Repository Factory
  * 
@@ -44,7 +46,7 @@ public class ArtifactRepositoryFactoryImpl implements ArtifactRepositoryFactory 
 	public ArtifactRepository createRepository(Path path) {
 		Objects.requireNonNull(path, "Path cannot be null!");
 
-		validateLocalRepositoryPath(path);
+		FileSystemUtil.validateDirectory(path);
 
 		return new LocalArtifactRepositoryImpl(path);
 	}
@@ -62,25 +64,11 @@ public class ArtifactRepositoryFactoryImpl implements ArtifactRepositoryFactory 
 			throw new NullPointerException("Configuration properties cannot be empty!");
 		} else if (!configurationProperties.containsKey(REMOTE_ARTIFACT_REPOSITORY_NAME)) {
 			throw new NullPointerException("Remote repository name is required!");
-		} else if (!configurationProperties.containsKey(LOCAL_ARTIFACT_REPOSITORY_PATH)) {
-			throw new NullPointerException("Local repository path is required!");
+		} else if (configurationProperties.containsKey(LOCAL_ARTIFACT_REPOSITORY_PATH)) {
+			FileSystemUtil.validateDirectory(
+					Paths.get(String.valueOf(configurationProperties.get(LOCAL_ARTIFACT_REPOSITORY_PATH))));
 		}
-
-		validateLocalRepositoryPath(Paths
-				.get(String.valueOf(configurationProperties.get(LOCAL_ARTIFACT_REPOSITORY_PATH))));
 
 		return new RemoteArtifactRepositoryImpl(uri, configurationProperties);
-	}
-
-	private void validateLocalRepositoryPath(Path path) {
-		if (!path.toFile().exists()) {
-			LOG.error(String.format("Path '%s' does not exist!", path.toString()));
-			throw new IllegalArgumentException(String.format("Path '%s' does not exist!", path.toString()));
-		}
-
-		if (!path.toFile().isDirectory()) {
-			LOG.error(String.format("Path '%s' is not a directory!", path.toString()));
-			throw new IllegalArgumentException(String.format("Path '%s' is not a directory!", path.toString()));
-		}
 	}
 }

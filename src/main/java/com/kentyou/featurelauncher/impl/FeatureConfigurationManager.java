@@ -48,12 +48,12 @@ class FeatureConfigurationManager implements ServiceTrackerCustomizer<Configurat
 
 	private static final String CONFIGURATION_ADMIN_CLASS_NAME = "org.osgi.service.cm.ConfigurationAdmin";
 	private static final String CONFIGURATION_CLASS_NAME = "org.osgi.service.cm.Configuration";
-	private static final long CONFIGURATION_TIMEOUT_DEFAULT = 5000;
+	public static final long CONFIGURATION_TIMEOUT_DEFAULT = 5000;
 
 	private final BundleContext bundleContext;
 	private final Map<String, FeatureConfiguration> featureConfigurations;
 
-	private ServiceTracker<ConfigurationAdmin, Object> serviceTracker;
+	private final ServiceTracker<ConfigurationAdmin, Object> serviceTracker;
 
 	private Class<?> configurationAdminClass;
 	private Class<?> configurationClass;
@@ -69,36 +69,23 @@ class FeatureConfigurationManager implements ServiceTrackerCustomizer<Configurat
 		this.bundleContext = bundleContext;
 		this.featureConfigurations = featureConfigurations;
 
-		try {
-			this.configurationAdminClass = bundleContext.getBundle().loadClass(CONFIGURATION_ADMIN_CLASS_NAME);
-			this.configurationClass = bundleContext.getBundle().loadClass(CONFIGURATION_CLASS_NAME);
-
-			this.listConfigurationsMethod = configurationAdminClass.getMethod("listConfigurations", String.class);
-			this.getFactoryConfigurationMethod = configurationAdminClass.getMethod("getFactoryConfiguration",
-					String.class, String.class, String.class);
-			this.getConfigurationMethod = configurationAdminClass.getMethod("getConfiguration", String.class,
-					String.class);
-			this.getConfigurationPropertiesMethod = configurationClass.getMethod("getProperties");
-			this.updateConfigurationPropertiesMethod = configurationClass.getMethod("update", Dictionary.class);
-
-		} catch (ClassNotFoundException | NoSuchMethodException | SecurityException e) {
-			LOG.error("Error initializing FeatureConfigurationManager!", e);
-		}
+		this.serviceTracker = new ServiceTracker<>(this.bundleContext, ConfigurationAdmin.class, this);
+		this.serviceTracker.open(true);
 	}
 
-	public void start() throws InterruptedException {
-		serviceTracker = new ServiceTracker<>(this.bundleContext, ConfigurationAdmin.class, this);
-		serviceTracker.open();
-
-		if (serviceTracker.waitForService(CONFIGURATION_TIMEOUT_DEFAULT) == null) { // TODO: handle other special values
-																					// defined in 160.8.4.3
-			throw new LaunchException("'ConfigurationAdmin' service is not available!");
+	// TODO: handle other timeout values as defined in 160.8.4.3
+	public void waitForService(long timeout) {
+		try {
+			if (serviceTracker.waitForService(timeout) == null) {
+				throw new LaunchException("'ConfigurationAdmin' service is not available!");
+			}
+		} catch (InterruptedException e) {
+			throw new LaunchException("Error awaiting 'ConfigurationAdmin' service!", e);
 		}
 	}
 
 	public void stop() {
 		serviceTracker.close();
-		serviceTracker = null;
 	}
 
 	/* 
@@ -109,13 +96,9 @@ class FeatureConfigurationManager implements ServiceTrackerCustomizer<Configurat
 	public Object addingService(ServiceReference<ConfigurationAdmin> reference) {
 		LOG.info("Added ConfigurationAdmin service"); // TODO: change to debug level
 
-		Object configurationAdminService = bundleContext.getService(reference);
+		createConfigurationsIfNeeded(reference);
 
-		if (configurationAdminService != null) {
-			createConfigurationsIfNeeded(configurationAdminService);
-		}
-
-		return configurationAdminService;
+		return bundleContext.getService(reference);
 	}
 
 	/* 
@@ -138,12 +121,30 @@ class FeatureConfigurationManager implements ServiceTrackerCustomizer<Configurat
 		LOG.info("Removed ConfigurationAdmin service"); // TODO: change to debug level
 	}
 
-	private void createConfigurationsIfNeeded(Object configurationAdminService) {
+	private void createConfigurationsIfNeeded(ServiceReference<ConfigurationAdmin> reference) {
 		if (!featureConfigurations.isEmpty()) {
 			LOG.info(String.format("There are %d feature configuration(s) to create", featureConfigurations.size()));
 
-			featureConfigurations.forEach((featureConfigurationPid, featureConfiguration) -> createConfiguration(
-					featureConfigurationPid, featureConfiguration, configurationAdminService));
+			try {
+				Object configurationAdminService = bundleContext.getService(reference);
+
+				this.configurationAdminClass = reference.getBundle().loadClass(CONFIGURATION_ADMIN_CLASS_NAME);
+				this.configurationClass = reference.getBundle().loadClass(CONFIGURATION_CLASS_NAME);
+
+				this.listConfigurationsMethod = configurationAdminClass.getMethod("listConfigurations", String.class);
+				this.getFactoryConfigurationMethod = configurationAdminClass.getMethod("getFactoryConfiguration",
+						String.class, String.class, String.class);
+				this.getConfigurationMethod = configurationAdminClass.getMethod("getConfiguration", String.class,
+						String.class);
+				this.getConfigurationPropertiesMethod = configurationClass.getMethod("getProperties");
+				this.updateConfigurationPropertiesMethod = configurationClass.getMethod("update", Dictionary.class);
+
+				featureConfigurations.forEach((featureConfigurationPid, featureConfiguration) -> createConfiguration(
+						featureConfigurationPid, featureConfiguration, configurationAdminService));
+
+			} catch (ClassNotFoundException | NoSuchMethodException | SecurityException e) {
+				LOG.error("Error creating configurations!", e);
+			}
 
 		} else {
 			LOG.info("Feature has no configurations!");

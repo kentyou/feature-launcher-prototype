@@ -20,14 +20,16 @@ import org.osgi.service.feature.ID;
 import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 
 /**
- * Defines currently missing but very useful methods which should be added to
- * {@link org.osgi.service.featurelauncher.repository.ArtifactRepository}
+ * Defines additional method(s) for file system artifact repository
+ * implementations, where artifacts are stored in file system.
  * 
  * @author Michael H. Siemaszko (mhs@into.software)
  * @since Sep 26, 2024
  */
 @ConsumerType
-public interface EnhancedArtifactRepository extends ArtifactRepository {
+public interface FileSystemArtifactRepository extends ArtifactRepository {
 
 	public Path getArtifactPath(ID id);
+
+	public Path getLocalRepositoryPath();
 }

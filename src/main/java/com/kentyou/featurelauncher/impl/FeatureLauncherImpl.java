@@ -16,12 +16,7 @@ package com.kentyou.featurelauncher.impl;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
-import java.nio.file.FileVisitResult;
-import java.nio.file.FileVisitor;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -55,6 +50,7 @@ import org.slf4j.LoggerFactory;
 
 import com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryFactoryImpl;
 import com.kentyou.featurelauncher.impl.util.BundleEventUtil;
+import com.kentyou.featurelauncher.impl.util.FileSystemUtil;
 import com.kentyou.featurelauncher.impl.util.FrameworkEventUtil;
 
 /**
@@ -246,21 +242,20 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			/////////////////////////////////////////////////////////
 			// 160.4.3.4: Installing bundles and configurations
 			installBundles(framework);
-
-			// FIXME: configurations can only be installed once 'ConfigurationAdmin' service
-			// is available, and that is only once framework is started, so section
-			// "160.4.3.4" title ( "Installing bundles and configurations" ) is misleading
-			// ..
+			
+			createConfigurationAdminTrackerIfNeeded(framework.getBundleContext());
 
 			//////////////////////////////////////////
 			// 160.4.3.5: Starting the framework
 			startFramework(framework);
+			
+			waitForConfigurationAdminTrackerIfNeeded(FeatureConfigurationManager.CONFIGURATION_TIMEOUT_DEFAULT);
 
 			this.isLaunched = true;
 
 			return framework;
 		}
-
+		
 		private Framework createFramework(FrameworkFactory frameworkFactory, Map<String, String> frameworkProperties) {
 			Framework framework = frameworkFactory.newFramework(frameworkProperties);
 			try {
@@ -268,25 +263,20 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 
 				addLogListeners(framework);
 
-				// TIM: if ConfigurationAdmin service tracker is initialized and started using
-				// Framework's Bundle Context, it never becomes available - i.e. neither via
-				// `org.osgi.util.tracker.ServiceTracker.waitForService(long)` nor via
-				// `org.osgi.util.tracker.ServiceTrackerCustomizer#addingService(org.osgi.framework.ServiceReference)`
-//				startConfigurationAdminTrackerIfNeeded(framework.getBundleContext());
-
 			} catch (BundleException e) {
 				LOG.error("Could not initialize framework!", e);
 				throw new LaunchException("Could not initialize framework!", e);
 			}
 			return framework;
 		}
-
+		
 		private void startFramework(Framework framework) {
 			LOG.info("Starting framework..");
 			try {
 				framework.start();
-
-				startBundles();
+				
+				// TODO: once start levels are involved, bundles can be started transiently, before call to framework.start()
+				startBundles(); 
 
 				createShutdownHook(framework);
 
@@ -305,26 +295,31 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 				startBundle(installedBundle);
 			}
 		}
-
+		
 		private void startBundle(Bundle installedBundle) throws BundleException, InterruptedException {
 			if (installedBundle.getHeaders().get(Constants.FRAGMENT_HOST) == null) {
 				installedBundle.start();
-
-				startConfigurationAdminTrackerIfNeeded(installedBundle.getBundleContext());
 			}
 		}
-
-		private void startConfigurationAdminTrackerIfNeeded(BundleContext bundleContext) throws InterruptedException {
+		
+		private void createConfigurationAdminTrackerIfNeeded(BundleContext bundleContext) {
 			if (featureConfigurationManager == null && !feature.getConfigurations().isEmpty()) {
 				featureConfigurationManager = new FeatureConfigurationManager(bundleContext,
 						feature.getConfigurations());
-				featureConfigurationManager.start();
 
 				LOG.info(String.format("Started ConfigurationAdmin service tracker for bundle '%s'",
 						bundleContext.getBundle().getSymbolicName()));
 			}
 		}
+		
+		private void waitForConfigurationAdminTrackerIfNeeded(long timeout) {
+			if (featureConfigurationManager != null) {
+				featureConfigurationManager.waitForService(timeout);
 
+				LOG.info("'ConfigurationAdmin' service is available!");
+			}
+		}
+		
 		private void stopConfigurationAdminTracker() {
 			if (featureConfigurationManager != null) {
 				featureConfigurationManager.stop();
@@ -418,19 +413,20 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 					}
 				}
 			}
+			
+			// TODO: count down on latch passed to builder so outside calling code knows when framework is actually "done"
 
 			if (frameworkProps.containsKey(Constants.FRAMEWORK_STORAGE)
 					&& frameworkProps.containsKey(Constants.FRAMEWORK_STORAGE_CLEAN)
 					&& FRAMEWORK_STORAGE_CLEAN_TESTONLY.equals(frameworkProps.get(Constants.FRAMEWORK_STORAGE_CLEAN))) {
 				try {
-					deleteFrameworkStorageArea(
-							Paths.get(String.valueOf(frameworkProps.get(Constants.FRAMEWORK_STORAGE))));
+					FileSystemUtil.recursivelyDelete(Paths.get(String.valueOf(frameworkProps.get(Constants.FRAMEWORK_STORAGE))));
 				} catch (IOException e) {
 					LOG.warn("Could not delete framework storage area!", e);
 				}
 			}
 		}
-
+		
 		private void createShutdownHook(Framework framework) {
 			Runtime.getRuntime().addShutdownHook(new Thread() {
 				@Override
@@ -474,51 +470,6 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			}
 
 			return Collections.emptyMap();
-		}
-
-		/**
-		 * Based on:
-		 * {@link aQute.bnd.test.jupiter.TemporaryDirectoryExtension.delete(Path)}
-		 **/
-		private static void deleteFrameworkStorageArea(Path path) throws IOException {
-			path = path.toAbsolutePath();
-			if (Files.notExists(path) && !Files.isSymbolicLink(path)) {
-				return;
-			}
-			if (path.equals(path.getRoot()))
-				throw new IllegalArgumentException("Cannot recursively delete root for safety reasons");
-
-			Files.walkFileTree(path, new FileVisitor<Path>() {
-				@Override
-				public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-					return FileVisitResult.CONTINUE;
-				}
-
-				@Override
-				public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-					Files.delete(file);
-					return FileVisitResult.CONTINUE;
-				}
-
-				@Override
-				public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
-					try {
-						Files.delete(file);
-					} catch (IOException e) {
-						throw exc;
-					}
-					return FileVisitResult.CONTINUE;
-				}
-
-				@Override
-				public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-					if (exc != null) { // directory iteration failed
-						throw exc;
-					}
-					Files.delete(dir);
-					return FileVisitResult.CONTINUE;
-				}
-			});
 		}
 	}
 

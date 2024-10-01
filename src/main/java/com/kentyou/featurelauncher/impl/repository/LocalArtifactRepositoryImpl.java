@@ -24,7 +24,6 @@ import java.util.Objects;
 import java.util.Optional;
 
 import org.osgi.service.feature.ID;
-import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,8 +33,7 @@ import org.slf4j.LoggerFactory;
  * @author Michael H. Siemaszko (mhs@into.software)
  * @since Sep 15, 2024
  */
-// TODO: implement {@link org.osgi.service.featurelauncher.repository.ArtifactRepository} directly once missing methods are available on that interface
-class LocalArtifactRepositoryImpl implements EnhancedArtifactRepository {
+class LocalArtifactRepositoryImpl implements FileSystemArtifactRepository {
 	private static final Logger LOG = LoggerFactory.getLogger(LocalArtifactRepositoryImpl.class);
 
 	private static final String DEFAULT_EXTENSION = "jar";
@@ -90,7 +88,7 @@ class LocalArtifactRepositoryImpl implements EnhancedArtifactRepository {
 
 		return null;
 	}
-	
+
 	/* 
 	 * (non-Javadoc)
 	 * @see com.kentyou.featurelauncher.impl.repository.EnhancedArtifactRepository#getArtifactPath(org.osgi.service.feature.ID)
@@ -98,12 +96,22 @@ class LocalArtifactRepositoryImpl implements EnhancedArtifactRepository {
 	@Override
 	public Path getArtifactPath(ID id) {
 		Objects.requireNonNull(id, "ID cannot be null!");
-		
+
 		return getArtifactM2RepoPath(id);
+	}
+	
+	/* 
+	 * (non-Javadoc)
+	 * @see com.kentyou.featurelauncher.impl.repository.FileSystemArtifactRepository#getLocalRepositoryPath()
+	 */
+	@Override
+	public Path getLocalRepositoryPath() {
+		return localRepositoryPath;
 	}
 
 	private Path getArtifactM2RepoPath(ID id) {
-		Path projectHome = Paths.get(localRepositoryPath.toAbsolutePath().toString(), id.getGroupId().replace('.', '/'));
+		Path projectHome = Paths.get(localRepositoryPath.toAbsolutePath().toString(),
+				id.getGroupId().replace('.', '/'));
 
 		StringBuilder artifactName = new StringBuilder();
 		artifactName.append(id.getArtifactId());

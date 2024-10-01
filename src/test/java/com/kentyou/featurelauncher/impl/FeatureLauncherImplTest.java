@@ -62,11 +62,11 @@ public class FeatureLauncherImplTest {
 		}
 
 		localM2RepositoryPath = Paths.get(System.getProperty(LOCAL_ARTIFACT_REPOSITORY_PATH));
-		
+
 		// Configure framwork properties
 		frameworkStorageTempDir = Files.createTempDirectory("osgi_");
-		frameworkProperties = Map.of(Constants.FRAMEWORK_STORAGE, frameworkStorageTempDir, 
-									 Constants.FRAMEWORK_STORAGE_CLEAN, FRAMEWORK_STORAGE_CLEAN_TESTONLY);
+		frameworkProperties = Map.of(Constants.FRAMEWORK_STORAGE, frameworkStorageTempDir,
+				Constants.FRAMEWORK_STORAGE_CLEAN, FRAMEWORK_STORAGE_CLEAN_TESTONLY);
 
 		// Load the Feature Launcher
 		ServiceLoader<FeatureLauncher> loader = ServiceLoader.load(FeatureLauncher.class);
