@@ -26,4 +26,8 @@ public interface ArtifactRepositoryConstants {
 	static final URI REMOTE_ARTIFACT_REPOSITORY_URI = URI.create("https://repo1.maven.org/maven2/");
 
 	static final String LOCAL_ARTIFACT_REPOSITORY_PATH = "localRepositoryPath";
+	
+	static final String DEFAULT_LOCAL_ARTIFACT_REPOSITORY_NAME = "local";
+	
+	static final String DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME = "central";
 }

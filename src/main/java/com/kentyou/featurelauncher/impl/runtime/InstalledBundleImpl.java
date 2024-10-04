@@ -15,18 +15,33 @@ package com.kentyou.featurelauncher.impl.runtime;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 
 import org.osgi.framework.Bundle;
 import org.osgi.service.feature.ID;
 import org.osgi.service.featurelauncher.runtime.InstalledBundle;
 
 /**
- * TODO
+ * Implementation of {@link org.osgi.service.featurelauncher.runtime.InstalledBundle}
  * 
  * @author Michael H. Siemaszko (mhs@into.software)
  * @since Sep 15, 2024
  */
 class InstalledBundleImpl implements InstalledBundle {
+	private final ID bundleId;
+	private final Collection<ID> aliases;
+	private final Bundle bundle;
+	private final int startLevel;
+	private final List<ID> owningFeatures;
+
+	public InstalledBundleImpl(ID bundleId, Collection<ID> aliases, Bundle bundle, int startLevel,
+			List<ID> owningFeatures) {
+		this.bundleId = bundleId;
+		this.aliases = aliases;
+		this.bundle = bundle;
+		this.startLevel = startLevel;
+		this.owningFeatures = owningFeatures;
+	}
 
 	/* 
 	 * (non-Javadoc)
@@ -34,8 +49,7 @@ class InstalledBundleImpl implements InstalledBundle {
 	 */
 	@Override
 	public ID getBundleId() {
-		// TODO Auto-generated method stub
-		return null;
+		return bundleId;
 	}
 
 	/* 
@@ -44,8 +58,7 @@ class InstalledBundleImpl implements InstalledBundle {
 	 */
 	@Override
 	public Collection<ID> getAliases() {
-		// TODO Auto-generated method stub
-		return null;
+		return aliases;
 	}
 
 	/* 
@@ -54,8 +67,7 @@ class InstalledBundleImpl implements InstalledBundle {
 	 */
 	@Override
 	public Bundle getBundle() {
-		// TODO Auto-generated method stub
-		return null;
+		return bundle;
 	}
 
 	/* 
@@ -64,8 +76,7 @@ class InstalledBundleImpl implements InstalledBundle {
 	 */
 	@Override
 	public int getStartLevel() {
-		// TODO Auto-generated method stub
-		return 0;
+		return startLevel;
 	}
 
 	/* 
@@ -74,8 +85,43 @@ class InstalledBundleImpl implements InstalledBundle {
 	 */
 	@Override
 	public List<ID> getOwningFeatures() {
-		// TODO Auto-generated method stub
-		return null;
+		return owningFeatures;
 	}
 
+	/* 
+	 * (non-Javadoc)
+	 * @see java.lang.Object#hashCode()
+	 */
+	@Override
+	public int hashCode() {
+		return Objects.hash(aliases, bundle, bundleId, owningFeatures, startLevel);
+	}
+
+	/* 
+	 * (non-Javadoc)
+	 * @see java.lang.Object#equals(java.lang.Object)
+	 */
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		InstalledBundleImpl other = (InstalledBundleImpl) obj;
+		return Objects.equals(aliases, other.aliases) && Objects.equals(bundle, other.bundle)
+				&& Objects.equals(bundleId, other.bundleId) && Objects.equals(owningFeatures, other.owningFeatures)
+				&& startLevel == other.startLevel;
+	}
+
+	/* 
+	 * (non-Javadoc)
+	 * @see java.lang.Object#toString()
+	 */
+	@Override
+	public String toString() {
+		return "InstalledBundleImpl [bundleId=" + bundleId + ", aliases=" + aliases + ", bundle=" + bundle
+				+ ", startLevel=" + startLevel + ", owningFeatures=" + owningFeatures + "]";
+	}
 }

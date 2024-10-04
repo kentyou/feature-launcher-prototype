@@ -1,9 +1,8 @@
 {
-	"id": "com.kentyou.featurelauncher:gogo-console-feature:1.0",
+	"id": "com.kentyou.featurelauncher:console-webconsole-feature:1.0",
 	"name": "Gogo console and Felix webconsole feature",
 	"description": "Gogo console and Felix webconsole feature",
 	"complete": false,
-	// TODO: add Felix Webconsole artifacts - core, plus dependencies and maybe plugins
 	"bundles": [
 		{
 			"id": "org.apache.felix:org.apache.felix.configadmin:1.9.26"
@@ -31,6 +30,21 @@
 		},
 		{
 			"id": "org.slf4j:slf4j-simple:2.0.9"
+		},
+		{
+			"id": "org.apache.felix:org.apache.felix.http.servlet-api:2.1.0"
+		},
+		{
+			"id": "org.apache.felix:org.apache.felix.http.jetty:5.0.4"
+		},
+		{
+			"id": "commons-io:commons-io:2.6"
+		},
+		{
+			"id": "commons-fileupload:commons-fileupload:1.5"
+		},
+		{
+			"id": "org.apache.felix:org.apache.felix.webconsole:4.8.8"
 		}
 	],
 	"configurations": {

@@ -14,6 +14,7 @@
 package com.kentyou.featurelauncher.impl.runtime;
 
 import java.util.List;
+import java.util.Objects;
 
 import org.osgi.service.feature.ID;
 import org.osgi.service.featurelauncher.runtime.InstalledBundle;
@@ -21,12 +22,24 @@ import org.osgi.service.featurelauncher.runtime.InstalledConfiguration;
 import org.osgi.service.featurelauncher.runtime.InstalledFeature;
 
 /**
- * TODO
+ * Implementation of {@link org.osgi.service.featurelauncher.runtime.InstalledFeature}
  * 
  * @author Michael H. Siemaszko (mhs@into.software)
  * @since Sep 15, 2024
  */
 class InstalledFeatureImpl implements InstalledFeature {
+	private final ID featureId;
+	private final boolean isInitialLaunch;
+	private final List<InstalledBundle> installedBundles;
+	private final List<InstalledConfiguration> installedConfigurations;
+
+	public InstalledFeatureImpl(ID featureId, boolean isInitialLaunch, List<InstalledBundle> installedBundles,
+			List<InstalledConfiguration> installedConfigurations) {
+		this.featureId = featureId;
+		this.isInitialLaunch = isInitialLaunch;
+		this.installedBundles = installedBundles;
+		this.installedConfigurations = installedConfigurations;
+	}
 
 	/* 
 	 * (non-Javadoc)
@@ -34,8 +47,7 @@ class InstalledFeatureImpl implements InstalledFeature {
 	 */
 	@Override
 	public ID getFeatureId() {
-		// TODO Auto-generated method stub
-		return null;
+		return featureId;
 	}
 
 	/* 
@@ -44,8 +56,7 @@ class InstalledFeatureImpl implements InstalledFeature {
 	 */
 	@Override
 	public boolean isInitialLaunch() {
-		// TODO Auto-generated method stub
-		return false;
+		return isInitialLaunch;
 	}
 
 	/* 
@@ -54,8 +65,7 @@ class InstalledFeatureImpl implements InstalledFeature {
 	 */
 	@Override
 	public List<InstalledBundle> getInstalledBundles() {
-		// TODO Auto-generated method stub
-		return null;
+		return installedBundles;
 	}
 
 	/* 
@@ -64,8 +74,44 @@ class InstalledFeatureImpl implements InstalledFeature {
 	 */
 	@Override
 	public List<InstalledConfiguration> getInstalledConfigurations() {
-		// TODO Auto-generated method stub
-		return null;
+		return installedConfigurations;
 	}
 
+	/* 
+	 * (non-Javadoc)
+	 * @see java.lang.Object#hashCode()
+	 */
+	@Override
+	public int hashCode() {
+		return Objects.hash(featureId, installedBundles, installedConfigurations, isInitialLaunch);
+	}
+
+	/* 
+	 * (non-Javadoc)
+	 * @see java.lang.Object#equals(java.lang.Object)
+	 */
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		InstalledFeatureImpl other = (InstalledFeatureImpl) obj;
+		return Objects.equals(featureId, other.featureId) && Objects.equals(installedBundles, other.installedBundles)
+				&& Objects.equals(installedConfigurations, other.installedConfigurations)
+				&& isInitialLaunch == other.isInitialLaunch;
+	}
+
+	/* 
+	 * (non-Javadoc)
+	 * @see java.lang.Object#toString()
+	 */
+	@Override
+	public String toString() {
+		return "InstalledFeatureImpl [featureId=" + featureId + ", isInitialLaunch=" + isInitialLaunch
+				+ ", installedBundles=" + installedBundles + ", installedConfigurations=" + installedConfigurations
+				+ "]";
+	}
 }

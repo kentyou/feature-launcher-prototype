@@ -13,6 +13,8 @@
  */
 package com.kentyou.featurelauncher.impl;
 
+import static com.kentyou.featurelauncher.impl.FeatureLauncherImplConstants.FRAMEWORK_STORAGE_CLEAN_TESTONLY;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
@@ -61,7 +63,6 @@ import com.kentyou.featurelauncher.impl.util.FrameworkEventUtil;
  */
 public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implements FeatureLauncher {
 	private static final Logger LOG = LoggerFactory.getLogger(FeatureLauncherImpl.class);
-	static final String FRAMEWORK_STORAGE_CLEAN_TESTONLY = "testOnly";
 	
 	/* 
 	 * (non-Javadoc)
@@ -105,7 +106,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 		private Map<String, Object> frameworkProps;
 		private List<FeatureDecorator> decorators;
 		private Map<String, FeatureExtensionHandler> extensionHandlers;
-		private FeatureConfigurationManager featureConfigurationManager;
+		private FeatureLauncherConfigurationManager featureConfigurationManager;
 
 		LaunchBuilderImpl(Feature feature) {
 			Objects.requireNonNull(feature, "Feature cannot be null!");
@@ -242,20 +243,20 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			/////////////////////////////////////////////////////////
 			// 160.4.3.4: Installing bundles and configurations
 			installBundles(framework);
-			
+
 			createConfigurationAdminTrackerIfNeeded(framework.getBundleContext());
 
 			//////////////////////////////////////////
 			// 160.4.3.5: Starting the framework
 			startFramework(framework);
-			
-			waitForConfigurationAdminTrackerIfNeeded(FeatureConfigurationManager.CONFIGURATION_TIMEOUT_DEFAULT);
+
+			waitForConfigurationAdminTrackerIfNeeded(FeatureLauncherConfigurationManager.CONFIGURATION_TIMEOUT_DEFAULT);
 
 			this.isLaunched = true;
 
 			return framework;
 		}
-		
+
 		private Framework createFramework(FrameworkFactory frameworkFactory, Map<String, String> frameworkProperties) {
 			Framework framework = frameworkFactory.newFramework(frameworkProperties);
 			try {
@@ -269,14 +270,15 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			}
 			return framework;
 		}
-		
+
 		private void startFramework(Framework framework) {
 			LOG.info("Starting framework..");
 			try {
 				framework.start();
-				
-				// TODO: once start levels are involved, bundles can be started transiently, before call to framework.start()
-				startBundles(); 
+
+				// TODO: once start levels are involved, bundles can be started transiently,
+				// before call to framework.start()
+				startBundles();
 
 				createShutdownHook(framework);
 
@@ -295,23 +297,23 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 				startBundle(installedBundle);
 			}
 		}
-		
+
 		private void startBundle(Bundle installedBundle) throws BundleException, InterruptedException {
 			if (installedBundle.getHeaders().get(Constants.FRAGMENT_HOST) == null) {
 				installedBundle.start();
 			}
 		}
-		
+
 		private void createConfigurationAdminTrackerIfNeeded(BundleContext bundleContext) {
 			if (featureConfigurationManager == null && !feature.getConfigurations().isEmpty()) {
-				featureConfigurationManager = new FeatureConfigurationManager(bundleContext,
+				featureConfigurationManager = new FeatureLauncherConfigurationManager(bundleContext,
 						feature.getConfigurations());
 
 				LOG.info(String.format("Started ConfigurationAdmin service tracker for bundle '%s'",
 						bundleContext.getBundle().getSymbolicName()));
 			}
 		}
-		
+
 		private void waitForConfigurationAdminTrackerIfNeeded(long timeout) {
 			if (featureConfigurationManager != null) {
 				featureConfigurationManager.waitForService(timeout);
@@ -319,7 +321,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 				LOG.info("'ConfigurationAdmin' service is available!");
 			}
 		}
-		
+
 		private void stopConfigurationAdminTracker() {
 			if (featureConfigurationManager != null) {
 				featureConfigurationManager.stop();
@@ -402,6 +404,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 
 					try {
 						if (installedBundle.getState() != Bundle.UNINSTALLED) {
+							installedBundle.stop();
 							installedBundle.uninstall();
 							LOG.info(String.format("Uninstalled bundle '%s'", installedBundle.getSymbolicName()));
 						}
@@ -413,20 +416,22 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 					}
 				}
 			}
-			
-			// TODO: count down on latch passed to builder so outside calling code knows when framework is actually "done"
+
+			// TODO: count down on latch passed to builder so outside calling code knows
+			// when framework is actually "done"
 
 			if (frameworkProps.containsKey(Constants.FRAMEWORK_STORAGE)
 					&& frameworkProps.containsKey(Constants.FRAMEWORK_STORAGE_CLEAN)
 					&& FRAMEWORK_STORAGE_CLEAN_TESTONLY.equals(frameworkProps.get(Constants.FRAMEWORK_STORAGE_CLEAN))) {
 				try {
-					FileSystemUtil.recursivelyDelete(Paths.get(String.valueOf(frameworkProps.get(Constants.FRAMEWORK_STORAGE))));
+					FileSystemUtil.recursivelyDelete(
+							Paths.get(String.valueOf(frameworkProps.get(Constants.FRAMEWORK_STORAGE))));
 				} catch (IOException e) {
 					LOG.warn("Could not delete framework storage area!", e);
 				}
 			}
 		}
-		
+
 		private void createShutdownHook(Framework framework) {
 			Runtime.getRuntime().addShutdownHook(new Thread() {
 				@Override

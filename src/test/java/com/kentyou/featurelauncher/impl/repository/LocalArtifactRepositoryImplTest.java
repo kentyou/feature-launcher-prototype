@@ -14,10 +14,10 @@
 package com.kentyou.featurelauncher.impl.repository;
 
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.LOCAL_ARTIFACT_REPOSITORY_PATH;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -31,9 +31,10 @@ import java.util.jar.Attributes;
 import java.util.jar.JarInputStream;
 import java.util.jar.Manifest;
 
-import org.apache.felix.feature.impl.IDImpl;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.osgi.service.feature.FeatureService;
+import org.osgi.service.feature.ID;
 import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 import org.osgi.service.featurelauncher.repository.ArtifactRepositoryFactory;
 
@@ -50,9 +51,10 @@ import org.osgi.service.featurelauncher.repository.ArtifactRepositoryFactory;
  */
 public class LocalArtifactRepositoryImplTest {
 	ArtifactRepositoryFactory artifactRepositoryFactory;
+	FeatureService featureService;
 	Path localM2RepositoryPath;
 
-	@Before
+	@BeforeEach
 	public void setUp() {
 		// Obtain path of dedicated local Maven repository
 		if (System.getProperty(LOCAL_ARTIFACT_REPOSITORY_PATH) == null) {
@@ -62,13 +64,23 @@ public class LocalArtifactRepositoryImplTest {
 		localM2RepositoryPath = Paths.get(System.getProperty(LOCAL_ARTIFACT_REPOSITORY_PATH));
 
 		// Load the Artifact Repository Factory
-		ServiceLoader<ArtifactRepositoryFactory> loader = ServiceLoader.load(ArtifactRepositoryFactory.class);
-		Optional<ArtifactRepositoryFactory> artifactRepositoryFactoryOptional = loader.findFirst();
-
-		if (artifactRepositoryFactoryOptional.isPresent()) {
-			artifactRepositoryFactory = artifactRepositoryFactoryOptional.get();
+		ServiceLoader<ArtifactRepositoryFactory> artifactRepositoryFactoryServiceLoader = ServiceLoader
+				.load(ArtifactRepositoryFactory.class);
+		Optional<ArtifactRepositoryFactory> artifactRepositoryFactoryServiceLoaderOptional = artifactRepositoryFactoryServiceLoader
+				.findFirst();
+		if (artifactRepositoryFactoryServiceLoaderOptional.isPresent()) {
+			artifactRepositoryFactory = artifactRepositoryFactoryServiceLoaderOptional.get();
 		} else {
 			throw new IllegalStateException("Error loading artifact repository factory!");
+		}
+
+		// Load the Feature Service
+		ServiceLoader<FeatureService> featureServiceLoader = ServiceLoader.load(FeatureService.class);
+		Optional<FeatureService> featureServiceLoaderOptional = featureServiceLoader.findFirst();
+		if (featureServiceLoaderOptional.isPresent()) {
+			featureService = featureServiceLoaderOptional.get();
+		} else {
+			throw new IllegalStateException("Error loading feature service!");
 		}
 	}
 
@@ -110,7 +122,7 @@ public class LocalArtifactRepositoryImplTest {
 		assertNotNull(localArtifactRepository);
 		assertTrue(localArtifactRepository instanceof LocalArtifactRepositoryImpl);
 
-		IDImpl artifactId = IDImpl.fromMavenID("org.osgi:org.osgi.service.feature:1.0.0");
+		ID artifactId = featureService.getIDfromMavenCoordinates("org.osgi:org.osgi.service.feature:1.0.0");
 		assertNotNull(artifactId);
 
 		try (JarInputStream jarIs = new JarInputStream(localArtifactRepository.getArtifact(artifactId))) {
