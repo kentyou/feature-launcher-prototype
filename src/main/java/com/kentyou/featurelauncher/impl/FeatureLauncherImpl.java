@@ -16,6 +16,7 @@ package com.kentyou.featurelauncher.impl;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -25,8 +26,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceLoader;
+import java.util.stream.Collectors;
 
 import org.osgi.framework.Bundle;
+import org.osgi.framework.BundleContext;
 import org.osgi.framework.BundleEvent;
 import org.osgi.framework.BundleException;
 import org.osgi.framework.Constants;
@@ -47,8 +50,8 @@ import org.slf4j.LoggerFactory;
 
 import com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryFactoryImpl;
 import com.kentyou.featurelauncher.impl.util.BundleEventUtil;
+import com.kentyou.featurelauncher.impl.util.FileSystemUtil;
 import com.kentyou.featurelauncher.impl.util.FrameworkEventUtil;
-import com.kentyou.featurelauncher.impl.util.FrameworkFactoryLocator;
 
 /**
  * 160.4 The Feature Launcher
@@ -58,6 +61,7 @@ import com.kentyou.featurelauncher.impl.util.FrameworkFactoryLocator;
  */
 public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implements FeatureLauncher {
 	private static final Logger LOG = LoggerFactory.getLogger(FeatureLauncherImpl.class);
+	static final String FRAMEWORK_STORAGE_CLEAN_TESTONLY = "testOnly";
 	
 	/* 
 	 * (non-Javadoc)
@@ -101,6 +105,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 		private Map<String, Object> frameworkProps;
 		private List<FeatureDecorator> decorators;
 		private Map<String, FeatureExtensionHandler> extensionHandlers;
+		private FeatureConfigurationManager featureConfigurationManager;
 
 		LaunchBuilderImpl(Feature feature) {
 			Objects.requireNonNull(feature, "Feature cannot be null!");
@@ -227,30 +232,30 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 
 			/////////////////////////////////////////////////
 			// 160.4.3.2: Locating a framework implementation
-
-			// use default framework implementation for now
-			FrameworkFactory frameworkFactory = FrameworkFactoryLocator.loadDefaultFrameworkFactory();
-			Objects.requireNonNull(frameworkFactory, "Framework Factory cannot be null!");
+			FrameworkFactory frameworkFactory = FrameworkFactoryLocator.locateFrameworkFactory(feature,
+					artifactRepositories);
 
 			///////////////////////////////////////////
 			// 160.4.3.3: Creating a Framework instance
-			Framework framework = createFramework(frameworkFactory, Collections.emptyMap());
+			Framework framework = createFramework(frameworkFactory, convertFrameworkProperties(frameworkProps));
 
 			/////////////////////////////////////////////////////////
 			// 160.4.3.4: Installing bundles and configurations
 			installBundles(framework);
-
-			// TODO: install configurations
+			
+			createConfigurationAdminTrackerIfNeeded(framework.getBundleContext());
 
 			//////////////////////////////////////////
 			// 160.4.3.5: Starting the framework
 			startFramework(framework);
+			
+			waitForConfigurationAdminTrackerIfNeeded(FeatureConfigurationManager.CONFIGURATION_TIMEOUT_DEFAULT);
 
 			this.isLaunched = true;
 
 			return framework;
 		}
-
+		
 		private Framework createFramework(FrameworkFactory frameworkFactory, Map<String, String> frameworkProperties) {
 			Framework framework = frameworkFactory.newFramework(frameworkProperties);
 			try {
@@ -264,17 +269,18 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			}
 			return framework;
 		}
-
+		
 		private void startFramework(Framework framework) {
 			LOG.info("Starting framework..");
 			try {
 				framework.start();
-
-				startBundles();
+				
+				// TODO: once start levels are involved, bundles can be started transiently, before call to framework.start()
+				startBundles(); 
 
 				createShutdownHook(framework);
 
-			} catch (BundleException e) {
+			} catch (BundleException | InterruptedException e) {
 				////////////////////////////////////
 				// 160.4.3.6: Cleanup after failure
 				cleanup(framework);
@@ -284,15 +290,42 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			}
 		}
 
-		private void startBundles() throws BundleException {
+		private void startBundles() throws BundleException, InterruptedException {
 			for (Bundle installedBundle : installedBundles) {
 				startBundle(installedBundle);
 			}
 		}
-
-		private void startBundle(Bundle installedBundle) throws BundleException {
+		
+		private void startBundle(Bundle installedBundle) throws BundleException, InterruptedException {
 			if (installedBundle.getHeaders().get(Constants.FRAGMENT_HOST) == null) {
 				installedBundle.start();
+			}
+		}
+		
+		private void createConfigurationAdminTrackerIfNeeded(BundleContext bundleContext) {
+			if (featureConfigurationManager == null && !feature.getConfigurations().isEmpty()) {
+				featureConfigurationManager = new FeatureConfigurationManager(bundleContext,
+						feature.getConfigurations());
+
+				LOG.info(String.format("Started ConfigurationAdmin service tracker for bundle '%s'",
+						bundleContext.getBundle().getSymbolicName()));
+			}
+		}
+		
+		private void waitForConfigurationAdminTrackerIfNeeded(long timeout) {
+			if (featureConfigurationManager != null) {
+				featureConfigurationManager.waitForService(timeout);
+
+				LOG.info("'ConfigurationAdmin' service is available!");
+			}
+		}
+		
+		private void stopConfigurationAdminTracker() {
+			if (featureConfigurationManager != null) {
+				featureConfigurationManager.stop();
+				featureConfigurationManager = null;
+
+				LOG.info("Stopped ConfigurationAdmin service tracker");
 			}
 		}
 
@@ -360,24 +393,40 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 		}
 
 		private void cleanup(Framework framework) {
+			Collections.reverse(installedBundles);
+
 			if (!installedBundles.isEmpty()) {
 				Iterator<Bundle> installedBundlesIt = installedBundles.iterator();
 				while (installedBundlesIt.hasNext()) {
 					Bundle installedBundle = installedBundlesIt.next();
 
 					try {
-						installedBundle.uninstall();
+						if (installedBundle.getState() != Bundle.UNINSTALLED) {
+							installedBundle.uninstall();
+							LOG.info(String.format("Uninstalled bundle '%s'", installedBundle.getSymbolicName()));
+						}
 
 						installedBundlesIt.remove();
 
-						LOG.info(String.format("Uninstalled bundle '%s'", installedBundle.getSymbolicName()));
 					} catch (BundleException exc) {
 						LOG.error(String.format("Cannot uninstall bundle '%s'", installedBundle.getSymbolicName()));
 					}
 				}
 			}
-		}
+			
+			// TODO: count down on latch passed to builder so outside calling code knows when framework is actually "done"
 
+			if (frameworkProps.containsKey(Constants.FRAMEWORK_STORAGE)
+					&& frameworkProps.containsKey(Constants.FRAMEWORK_STORAGE_CLEAN)
+					&& FRAMEWORK_STORAGE_CLEAN_TESTONLY.equals(frameworkProps.get(Constants.FRAMEWORK_STORAGE_CLEAN))) {
+				try {
+					FileSystemUtil.recursivelyDelete(Paths.get(String.valueOf(frameworkProps.get(Constants.FRAMEWORK_STORAGE))));
+				} catch (IOException e) {
+					LOG.warn("Could not delete framework storage area!", e);
+				}
+			}
+		}
+		
 		private void createShutdownHook(Framework framework) {
 			Runtime.getRuntime().addShutdownHook(new Thread() {
 				@Override
@@ -385,6 +434,8 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 					try {
 						if (framework != null) {
 							LOG.info("Stopping framework..");
+
+							stopConfigurationAdminTracker();
 
 							cleanup(framework);
 
@@ -403,6 +454,22 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 				LOG.error("Framework already launched!");
 				throw new IllegalStateException("Framework already launched!");
 			}
+		}
+
+		/**
+		 * FIXME: remove once conflict between
+		 * `org.osgi.service.featurelauncher.FeatureLauncher.LaunchBuilder.withFrameworkProperties(Map<String,
+		 * Object>)` and
+		 * `org.osgi.framework.launch.FrameworkFactory.newFramework(Map<String,
+		 * String>)` is resolved
+		 **/
+		private Map<String, String> convertFrameworkProperties(Map<String, Object> frameworkProperties) {
+			if (!frameworkProperties.isEmpty()) {
+				return frameworkProperties.entrySet().stream()
+						.collect(Collectors.toMap(Map.Entry::getKey, e -> String.valueOf(e.getValue())));
+			}
+
+			return Collections.emptyMap();
 		}
 	}
 
