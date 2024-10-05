@@ -14,9 +14,11 @@
 package com.kentyou.featurelauncher.impl;
 
 /**
- * TODO
+ * Additional constants, supplementing those defined in
+ * {@link org.osgi.service.featurelauncher.FeatureLauncherConstants} and
+ * {@link org.osgi.service.featurelauncher.runtime.FeatureRuntimeConstants}
  * 
- * @author michal
+ * @author Michael H. Siemaszko (mhs@into.software)
  * @since Oct 3, 2024
  */
 public final class FeatureLauncherImplConstants {

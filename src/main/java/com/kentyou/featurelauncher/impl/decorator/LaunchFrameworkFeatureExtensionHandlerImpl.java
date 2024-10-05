@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
 import com.kentyou.featurelauncher.impl.repository.FileSystemArtifactRepository;
 
 /**
- * TODO
+ * Implementation of {@link com.kentyou.featurelauncher.impl.decorator.LaunchFrameworkFeatureExtensionHandler}
  * 
  * @author Michael H. Siemaszko (mhs@into.software)
  * @since Sep 15, 2024

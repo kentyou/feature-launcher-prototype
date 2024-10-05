@@ -26,9 +26,9 @@ import org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler;
 import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 
 /**
- * TODO
+ * Handler for {@link org.osgi.service.featurelauncher.FeatureLauncherConstants.LAUNCH_FRAMEWORK} {@link org.osgi.service.feature.FeatureExtension}
  * 
- * @author michal
+ * @author Michael H. Siemaszko (mhs@into.software)
  * @since Sep 30, 2024
  */
 public interface LaunchFrameworkFeatureExtensionHandler extends FeatureExtensionHandler {
