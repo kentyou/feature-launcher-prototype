@@ -17,6 +17,8 @@ import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryCons
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME;
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.LOCAL_ARTIFACT_REPOSITORY_PATH;
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.REMOTE_ARTIFACT_REPOSITORY_URI;
+import static com.kentyou.featurelauncher.impl.util.ConfigurationUtil.CONFIGURATIONS_FILTER;
+import static com.kentyou.featurelauncher.impl.util.ConfigurationUtil.constructConfigurationsFilter;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -37,19 +39,20 @@ import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.osgi.framework.BundleContext;
 import org.osgi.framework.ServiceReference;
+import org.osgi.service.cm.Configuration;
 import org.osgi.service.cm.ConfigurationAdmin;
 import org.osgi.service.feature.FeatureService;
+import org.osgi.service.feature.ID;
 import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 import org.osgi.service.featurelauncher.runtime.FeatureRuntime;
 import org.osgi.service.featurelauncher.runtime.InstalledBundle;
+import org.osgi.service.featurelauncher.runtime.InstalledConfiguration;
 import org.osgi.service.featurelauncher.runtime.InstalledFeature;
-import org.osgi.test.common.annotation.InjectBundleContext;
 import org.osgi.test.common.annotation.InjectService;
 import org.osgi.test.common.service.ServiceAware;
 
-import com.kentyou.featurelauncher.impl.FeatureLauncherConfigurationManager;
+import com.kentyou.featurelauncher.impl.runtime.FeatureRuntimeConfigurationManager;
 
 /**
  * Tests {@link com.kentyou.featurelauncher.impl.runtime.FeatureRuntimeImpl}
@@ -61,9 +64,6 @@ import com.kentyou.featurelauncher.impl.FeatureLauncherConfigurationManager;
  */
 public class FeatureRuntimeIntegrationTest {
 	Path localM2RepositoryPath;
-
-	@InjectBundleContext
-	BundleContext bundleContext;
 
 	@BeforeEach
 	public void setUp() throws InterruptedException, IOException {
@@ -78,7 +78,7 @@ public class FeatureRuntimeIntegrationTest {
 	@Test
 	public void testServices(
 			@InjectService(cardinality = 1, timeout = 5000) ServiceAware<ConfigurationAdmin> configurationAdminServiceAware,
-			@InjectService(cardinality = 1, timeout = 5000) ServiceAware<FeatureLauncherConfigurationManager> featureConfigurationManagerServiceAware,
+			@InjectService(cardinality = 1, timeout = 5000) ServiceAware<FeatureRuntimeConfigurationManager> featureRuntimeConfigurationManagerServiceAware,
 			@InjectService(cardinality = 1, timeout = 5000) ServiceAware<FeatureService> featureServiceAware,
 			@InjectService(cardinality = 1, timeout = 5000) ServiceAware<FeatureRuntime> featureRuntimeServiceAware) {
 
@@ -88,11 +88,11 @@ public class FeatureRuntimeIntegrationTest {
 				.getServiceReference();
 		assertNotNull(configurationAdminServiceReference);
 
-		// FeatureConfigurationManager
-		assertEquals(1, featureConfigurationManagerServiceAware.getServices().size());
-		ServiceReference<FeatureLauncherConfigurationManager> featureConfigurationManagerServiceReference = featureConfigurationManagerServiceAware
+		// FeatureRuntimeConfigurationManager
+		assertEquals(1, featureRuntimeConfigurationManagerServiceAware.getServices().size());
+		ServiceReference<FeatureRuntimeConfigurationManager> featureRuntimeConfigurationManagerServiceReference = featureRuntimeConfigurationManagerServiceAware
 				.getServiceReference();
-		assertNotNull(featureConfigurationManagerServiceReference);
+		assertNotNull(featureRuntimeConfigurationManagerServiceReference);
 
 		// FeatureService
 		assertEquals(1, featureServiceAware.getServices().size());
@@ -160,6 +160,19 @@ public class FeatureRuntimeIntegrationTest {
 
 			assertEquals("org.apache.felix.gogo.runtime", installedBundles.get(2).getBundle().getSymbolicName());
 			assertTrue(installedBundles.get(2).getOwningFeatures().contains(installedFeature.getFeatureId()));
+
+			// Verify also via installed features
+			List<InstalledFeature> installedFeatures = featureRuntimeService.getInstalledFeatures();
+			assertFalse(installedFeatures.isEmpty());
+			assertEquals(1, installedFeatures.size());
+
+			// Remove feature
+			featureRuntimeService.remove(installedFeature.getFeatureId());
+
+			// Verify again via installed features
+			installedFeatures = featureRuntimeService.getInstalledFeatures();
+			assertTrue(installedFeatures.isEmpty());
+			assertEquals(0, installedFeatures.size());
 		}
 	}
 
@@ -212,6 +225,232 @@ public class FeatureRuntimeIntegrationTest {
 
 			assertEquals("org.apache.felix.gogo.runtime", installedBundles.get(2).getBundle().getSymbolicName());
 			assertTrue(installedBundles.get(2).getOwningFeatures().contains(installedFeature.getFeatureId()));
+
+			// Verify also via installed features
+			List<InstalledFeature> installedFeatures = featureRuntimeService.getInstalledFeatures();
+			assertFalse(installedFeatures.isEmpty());
+			assertEquals(1, installedFeatures.size());
+
+			// Remove feature
+			featureRuntimeService.remove(installedFeature.getFeatureId());
+
+			// Verify again via installed features
+			installedFeatures = featureRuntimeService.getInstalledFeatures();
+			assertTrue(installedFeatures.isEmpty());
+			assertEquals(0, installedFeatures.size());
+		}
+	}
+
+	@Test
+	public void testInstallFeatureWithConfigWithDefaultRepositories(
+			@InjectService(cardinality = 1, timeout = 5000) ServiceAware<FeatureRuntime> featureRuntimeServiceAware,
+			@InjectService(cardinality = 1, timeout = 5000) ServiceAware<FeatureRuntimeConfigurationManager> featureRuntimeConfigurationManagerServiceAware)
+			throws URISyntaxException, IOException {
+
+		assertEquals(1, featureRuntimeServiceAware.getServices().size());
+		FeatureRuntime featureRuntimeService = featureRuntimeServiceAware.getService();
+		assertNotNull(featureRuntimeService);
+
+		assertEquals(1, featureRuntimeConfigurationManagerServiceAware.getServices().size());
+		FeatureRuntimeConfigurationManager featureRuntimeConfigurationManagerService = featureRuntimeConfigurationManagerServiceAware
+				.getService();
+		assertNotNull(featureRuntimeConfigurationManagerService);
+
+		try (InputStream featureIs = getClass().getClassLoader()
+				.getResourceAsStream("/features/console-webconsole-feature.json");
+				Reader featureReader = new BufferedReader(
+						new InputStreamReader(featureIs, Charset.forName("UTF-8").newDecoder()));) {
+
+			// Install Feature using default repositories
+			// @formatter:off
+			InstalledFeature installedFeature = featureRuntimeService.install(featureReader)
+					.useDefaultRepositories(true)
+					.install();
+			// @formatter:on
+
+			assertNotNull(installedFeature);
+			assertFalse(installedFeature.isInitialLaunch());
+
+			assertNotNull(installedFeature.getFeatureId());
+			assertEquals("com.kentyou.featurelauncher:console-webconsole-feature:1.0",
+					installedFeature.getFeatureId().toString());
+
+			assertNotNull(installedFeature.getInstalledBundles());
+			List<InstalledBundle> installedBundles = installedFeature.getInstalledBundles();
+			assertEquals(10, installedBundles.size());
+
+			assertEquals("org.apache.felix.gogo.command", installedBundles.get(0).getBundle().getSymbolicName());
+			assertTrue(installedBundles.get(0).getOwningFeatures().contains(installedFeature.getFeatureId()));
+
+			assertEquals("org.apache.felix.gogo.shell", installedBundles.get(1).getBundle().getSymbolicName());
+			assertTrue(installedBundles.get(1).getOwningFeatures().contains(installedFeature.getFeatureId()));
+
+			assertEquals("org.apache.felix.gogo.runtime", installedBundles.get(2).getBundle().getSymbolicName());
+			assertTrue(installedBundles.get(2).getOwningFeatures().contains(installedFeature.getFeatureId()));
+
+			assertEquals("biz.aQute.gogo.commands.provider", installedBundles.get(3).getBundle().getSymbolicName());
+			assertTrue(installedBundles.get(3).getOwningFeatures().contains(installedFeature.getFeatureId()));
+
+			assertEquals("org.apache.felix.webconsole", installedBundles.get(9).getBundle().getSymbolicName());
+			assertTrue(installedBundles.get(9).getOwningFeatures().contains(installedFeature.getFeatureId()));
+
+			List<InstalledConfiguration> installedConfigurations = installedFeature.getInstalledConfigurations();
+			assertFalse(installedConfigurations.isEmpty());
+			assertEquals(2, installedConfigurations.size());
+
+			assertEquals("org.apache.felix.http~httpFeatureLauncherTest", installedConfigurations.get(0).getPid());
+			assertTrue(installedConfigurations.get(0).getFactoryPid().isPresent());
+			assertEquals("org.apache.felix.http", installedConfigurations.get(0).getFactoryPid().get());
+
+			assertEquals("org.apache.felix.webconsole.internal.servlet.OsgiManager",
+					installedConfigurations.get(1).getPid());
+
+			List<Configuration> configurations = featureRuntimeConfigurationManagerService
+					.getConfigurations(constructConfigurationsFilter());
+			assertFalse(configurations.isEmpty());
+			assertEquals(2, configurations.size());
+
+			for (Configuration configuration : configurations) {
+				assertTrue(Boolean.valueOf(String.valueOf(configuration.getProperties().get(CONFIGURATIONS_FILTER)))
+						.booleanValue());
+			}
+
+			// Verify also via installed features
+			List<InstalledFeature> installedFeatures = featureRuntimeService.getInstalledFeatures();
+			assertFalse(installedFeatures.isEmpty());
+			assertEquals(1, installedFeatures.size());
+
+			// Remove feature
+			featureRuntimeService.remove(installedFeature.getFeatureId());
+
+			// Verify again via installed features
+			installedFeatures = featureRuntimeService.getInstalledFeatures();
+			assertTrue(installedFeatures.isEmpty());
+			assertEquals(0, installedFeatures.size());
+		}
+	}
+
+	@Test
+	public void testUpdateFeatureWithConfigWithDefaultRepositories(
+			@InjectService(cardinality = 1, timeout = 5000) ServiceAware<FeatureRuntime> featureRuntimeServiceAware,
+			@InjectService(cardinality = 1, timeout = 5000) ServiceAware<FeatureRuntimeConfigurationManager> featureRuntimeConfigurationManagerServiceAware)
+			throws URISyntaxException, IOException {
+
+		assertEquals(1, featureRuntimeServiceAware.getServices().size());
+		FeatureRuntime featureRuntimeService = featureRuntimeServiceAware.getService();
+		assertNotNull(featureRuntimeService);
+
+		assertEquals(1, featureRuntimeConfigurationManagerServiceAware.getServices().size());
+		FeatureRuntimeConfigurationManager featureRuntimeConfigurationManagerService = featureRuntimeConfigurationManagerServiceAware
+				.getService();
+		assertNotNull(featureRuntimeConfigurationManagerService);
+
+		// Install Feature using default repositories
+		try (InputStream featureIs = getClass().getClassLoader()
+				.getResourceAsStream("/features/gogo-console-feature.json");
+				Reader featureReader = new BufferedReader(
+						new InputStreamReader(featureIs, Charset.forName("UTF-8").newDecoder()));) {
+
+			// @formatter:off
+			InstalledFeature installedFeature = featureRuntimeService.install(featureReader)
+					.useDefaultRepositories(true)
+					.install();
+			// @formatter:on
+			assertNotNull(installedFeature);
+			assertFalse(installedFeature.isInitialLaunch());
+
+			assertNotNull(installedFeature.getFeatureId());
+			assertEquals("com.kentyou.featurelauncher:gogo-console-feature:1.0",
+					installedFeature.getFeatureId().toString());
+
+			assertNotNull(installedFeature.getInstalledBundles());
+			List<InstalledBundle> installedBundles = installedFeature.getInstalledBundles();
+			assertEquals(3, installedBundles.size());
+
+			assertEquals("org.apache.felix.gogo.command", installedBundles.get(0).getBundle().getSymbolicName());
+			assertTrue(installedBundles.get(0).getOwningFeatures().contains(installedFeature.getFeatureId()));
+
+			assertEquals("org.apache.felix.gogo.shell", installedBundles.get(1).getBundle().getSymbolicName());
+			assertTrue(installedBundles.get(1).getOwningFeatures().contains(installedFeature.getFeatureId()));
+
+			assertEquals("org.apache.felix.gogo.runtime", installedBundles.get(2).getBundle().getSymbolicName());
+			assertTrue(installedBundles.get(2).getOwningFeatures().contains(installedFeature.getFeatureId()));
+		}
+
+		// Verify via installed features
+		List<InstalledFeature> installedFeatures = featureRuntimeService.getInstalledFeatures();
+		assertFalse(installedFeatures.isEmpty());
+		assertEquals(1, installedFeatures.size());
+
+		ID featureId = installedFeatures.get(0).getFeatureId();
+
+		// Update Feature with same ID with additional bundles
+		try (InputStream featureIs = getClass().getClassLoader()
+				.getResourceAsStream("/features/gogo-console-feature.update-with-webconsole.json");
+				Reader featureReader = new BufferedReader(
+						new InputStreamReader(featureIs, Charset.forName("UTF-8").newDecoder()));) {
+
+			// Update Feature using default repositories
+			// @formatter:off
+			InstalledFeature updatedFeature = featureRuntimeService.update(featureId, featureReader)
+					.useDefaultRepositories(true)
+					.update();
+			// @formatter:on
+
+			assertNotNull(updatedFeature);
+			assertFalse(updatedFeature.isInitialLaunch());
+
+			assertNotNull(updatedFeature.getFeatureId());
+			assertEquals("com.kentyou.featurelauncher:gogo-console-feature:1.0",
+					updatedFeature.getFeatureId().toString());
+
+			assertNotNull(updatedFeature.getInstalledBundles());
+			List<InstalledBundle> installedBundles = updatedFeature.getInstalledBundles();
+			assertEquals(10, installedBundles.size());
+
+			assertEquals("org.apache.felix.gogo.command", installedBundles.get(0).getBundle().getSymbolicName());
+			assertTrue(installedBundles.get(0).getOwningFeatures().contains(updatedFeature.getFeatureId()));
+
+			assertEquals("org.apache.felix.gogo.shell", installedBundles.get(1).getBundle().getSymbolicName());
+			assertTrue(installedBundles.get(1).getOwningFeatures().contains(updatedFeature.getFeatureId()));
+
+			assertEquals("org.apache.felix.gogo.runtime", installedBundles.get(2).getBundle().getSymbolicName());
+			assertTrue(installedBundles.get(2).getOwningFeatures().contains(updatedFeature.getFeatureId()));
+
+			assertEquals("biz.aQute.gogo.commands.provider", installedBundles.get(3).getBundle().getSymbolicName());
+			assertTrue(installedBundles.get(3).getOwningFeatures().contains(updatedFeature.getFeatureId()));
+
+			assertEquals("org.apache.felix.webconsole", installedBundles.get(9).getBundle().getSymbolicName());
+			assertTrue(installedBundles.get(9).getOwningFeatures().contains(updatedFeature.getFeatureId()));
+
+			List<InstalledConfiguration> installedConfigurations = updatedFeature.getInstalledConfigurations();
+			assertFalse(installedConfigurations.isEmpty());
+			assertEquals(2, installedConfigurations.size());
+
+			assertEquals("org.apache.felix.http~httpFeatureLauncherTest", installedConfigurations.get(0).getPid());
+			assertTrue(installedConfigurations.get(0).getFactoryPid().isPresent());
+			assertEquals("org.apache.felix.http", installedConfigurations.get(0).getFactoryPid().get());
+
+			assertEquals("org.apache.felix.webconsole.internal.servlet.OsgiManager",
+					installedConfigurations.get(1).getPid());
+
+			List<Configuration> configurations = featureRuntimeConfigurationManagerService
+					.getConfigurations(constructConfigurationsFilter());
+			assertFalse(configurations.isEmpty());
+			assertEquals(2, configurations.size());
+
+			for (Configuration configuration : configurations) {
+				assertTrue(Boolean.valueOf(String.valueOf(configuration.getProperties().get(CONFIGURATIONS_FILTER)))
+						.booleanValue());
+			}
+
+			// Remove feature
+			featureRuntimeService.remove(updatedFeature.getFeatureId());
+
+			// Verify again via installed features
+			installedFeatures = featureRuntimeService.getInstalledFeatures();
+			assertTrue(installedFeatures.isEmpty());
+			assertEquals(0, installedFeatures.size());
 		}
 	}
 }

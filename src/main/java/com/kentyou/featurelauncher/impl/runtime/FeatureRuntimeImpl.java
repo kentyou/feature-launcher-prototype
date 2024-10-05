@@ -640,8 +640,10 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 	}
 
 	private void removeFeatureConfigurations(ID featureId) {
-		featureRuntimeConfigurationManager
-				.removeConfigurations(Set.copyOf(installedFeaturesConfigurations.remove(featureId)));
+		if (installedFeaturesConfigurations.containsKey(featureId)) {
+			featureRuntimeConfigurationManager
+					.removeConfigurations(Set.copyOf(installedFeaturesConfigurations.remove(featureId)));
+		}
 	}
 
 	private void removeFeature(ID featureId) {
@@ -654,6 +656,8 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 		uninstallBundles(orderedBundleIDsForRemoval);
 
 		removeFeatureConfigurations(featureId);
+
+		installedFeatures.removeIf(f -> featureId.equals(f.getFeatureId()));
 	}
 
 	private Deque<ID> getBundleIDsForRemoval(ID featureId) {

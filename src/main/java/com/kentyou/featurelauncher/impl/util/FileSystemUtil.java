@@ -21,9 +21,9 @@ import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 
 /**
- * TODO
+ * Util for file system operations.
  * 
- * @author michal
+ * @author Michael H. Siemaszko (mhs@into.software)
  * @since Sep 30, 2024
  */
 public class FileSystemUtil {

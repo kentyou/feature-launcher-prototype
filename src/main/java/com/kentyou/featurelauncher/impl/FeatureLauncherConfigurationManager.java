@@ -13,6 +13,8 @@
  */
 package com.kentyou.featurelauncher.impl;
 
+import static com.kentyou.featurelauncher.impl.util.ConfigurationUtil.*;
+
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -162,7 +164,7 @@ public class FeatureLauncherConfigurationManager implements ServiceTrackerCustom
 			LOG.info(String.format("Creating configuration %s", featureConfigurationPid));
 
 			Object configurationObject = getConfigurationMethod.invoke(configurationAdminService,
-					featureConfiguration.getPid(), "?");
+					featureConfiguration.getPid(), CONFIGURATION_DEFAULT_LOCATION);
 
 			updateConfigurationProperties(configurationObject, featureConfigurationPid, featureConfiguration);
 
@@ -177,7 +179,7 @@ public class FeatureLauncherConfigurationManager implements ServiceTrackerCustom
 			LOG.info(String.format("Creating factory configuration %s", featureConfigurationPid));
 
 			Object configurationObject = getFactoryConfigurationMethod.invoke(configurationAdminService,
-					featureConfiguration.getFactoryPid().get(), featureConfiguration.getPid(), "?");
+					featureConfiguration.getFactoryPid().get(), normalizePid(featureConfiguration.getPid()), CONFIGURATION_DEFAULT_LOCATION);
 
 			updateConfigurationProperties(configurationObject, featureConfigurationPid, featureConfiguration);
 

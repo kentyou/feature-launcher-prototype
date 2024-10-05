@@ -13,17 +13,24 @@
  */
 package com.kentyou.featurelauncher.impl.runtime;
 
+import static com.kentyou.featurelauncher.impl.util.ConfigurationUtil.CONFIGURATIONS_FILTER;
+import static com.kentyou.featurelauncher.impl.util.ConfigurationUtil.CONFIGURATION_DEFAULT_LOCATION;
+import static com.kentyou.featurelauncher.impl.util.ConfigurationUtil.constructConfigurationsFilter;
+import static com.kentyou.featurelauncher.impl.util.ConfigurationUtil.normalizePid;
+
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Dictionary;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-import org.osgi.framework.FrameworkUtil;
 import org.osgi.framework.InvalidSyntaxException;
 import org.osgi.service.cm.Configuration;
 import org.osgi.service.cm.ConfigurationAdmin;
@@ -47,8 +54,6 @@ import org.slf4j.LoggerFactory;
 @Component(service = FeatureRuntimeConfigurationManager.class)
 public class FeatureRuntimeConfigurationManager {
 	private static final Logger LOG = LoggerFactory.getLogger(FeatureRuntimeConfigurationManager.class);
-
-	private static final String CONFIGURATIONS_FILTER = ".featurelauncher.config";
 
 	@Reference
 	ConfigurationAdmin configurationAdmin;
@@ -74,6 +79,21 @@ public class FeatureRuntimeConfigurationManager {
 		}
 	}
 
+	public List<Configuration> getConfigurations(String filter) {
+		try {
+			Configuration[] configurations = configurationAdmin.listConfigurations(filter);
+
+			if (configurations != null) {
+				return Stream.of(configurations).collect(Collectors.toList());
+			}
+
+		} catch (IOException | InvalidSyntaxException e) {
+			LOG.error("Error retrieving configurations!", e);
+		}
+
+		return Collections.emptyList();
+	}
+
 	private void createConfiguration(FeatureConfiguration featureConfiguration) {
 		if (featureConfiguration.getFactoryPid().isPresent()) {
 			createFactoryConfiguration(featureConfiguration);
@@ -83,7 +103,8 @@ public class FeatureRuntimeConfigurationManager {
 		try {
 			LOG.info(String.format("Creating configuration %s", featureConfiguration.getPid()));
 
-			Configuration configuration = configurationAdmin.getConfiguration(featureConfiguration.getPid());
+			Configuration configuration = configurationAdmin.getConfiguration(featureConfiguration.getPid(),
+					CONFIGURATION_DEFAULT_LOCATION);
 
 			updateConfigurationProperties(configuration, featureConfiguration);
 
@@ -96,8 +117,9 @@ public class FeatureRuntimeConfigurationManager {
 		try {
 			LOG.info(String.format("Creating factory configuration %s", featureConfiguration.getPid()));
 
-			Configuration configuration = configurationAdmin
-					.getFactoryConfiguration(featureConfiguration.getFactoryPid().get(), featureConfiguration.getPid());
+			Configuration configuration = configurationAdmin.getFactoryConfiguration(
+					featureConfiguration.getFactoryPid().get(), normalizePid(featureConfiguration.getPid()),
+					CONFIGURATION_DEFAULT_LOCATION);
 
 			updateConfigurationProperties(configuration, featureConfiguration);
 
@@ -107,8 +129,7 @@ public class FeatureRuntimeConfigurationManager {
 	}
 
 	private void updateConfigurationProperties(Configuration configuration, FeatureConfiguration featureConfiguration) {
-		Dictionary<String, Object> configurationProperties = FrameworkUtil
-				.asDictionary(featureConfiguration.getValues());
+		Dictionary<String, Object> configurationProperties = new Hashtable<>(featureConfiguration.getValues());
 
 		configurationProperties.put(CONFIGURATIONS_FILTER, Boolean.TRUE);
 
@@ -126,17 +147,5 @@ public class FeatureRuntimeConfigurationManager {
 				.map(s -> s.collect(Collectors.toMap(Configuration::getPid, Function.identity())))
 				.orElse(Map.of());
 		// @formatter:on
-	}
-
-	private String constructConfigurationsFilter() {
-		StringBuilder sb = new StringBuilder();
-
-		sb.append("(");
-		sb.append(CONFIGURATIONS_FILTER);
-		sb.append("=");
-		sb.append(Boolean.TRUE);
-		sb.append(")");
-
-		return sb.toString();
 	}
 }
