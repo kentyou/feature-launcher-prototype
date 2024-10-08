@@ -103,7 +103,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 		private List<ArtifactRepository> artifactRepositories;
 		private Map<String, Object> configuration;
 		private Map<String, Object> variables;
-		private Map<String, Object> frameworkProps;
+		private Map<String, String> frameworkProps;
 		private List<FeatureDecorator> decorators;
 		private Map<String, FeatureExtensionHandler> extensionHandlers;
 		private FeatureLauncherConfigurationManager featureConfigurationManager;
@@ -147,7 +147,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 
 			ensureNotLaunchedYet();
 
-			this.configuration = configuration;
+			this.configuration = Map.copyOf(configuration);
 
 			return this;
 		}
@@ -162,7 +162,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 
 			ensureNotLaunchedYet();
 
-			this.variables = variables;
+			this.variables = Map.copyOf(variables);
 
 			return this;
 		}
@@ -172,12 +172,12 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 		 * @see org.osgi.service.featurelauncher.FeatureLauncher.LaunchBuilder#withFrameworkProperties(java.util.Map)
 		 */
 		@Override
-		public LaunchBuilder withFrameworkProperties(Map<String, Object> frameworkProps) {
+		public LaunchBuilder withFrameworkProperties(Map<String, String> frameworkProps) {
 			Objects.requireNonNull(frameworkProps, "Framework launch properties cannot be null!");
 
 			ensureNotLaunchedYet();
 
-			this.frameworkProps = frameworkProps;
+			this.frameworkProps = Map.copyOf(frameworkProps);
 
 			return this;
 		}
@@ -238,7 +238,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 
 			///////////////////////////////////////////
 			// 160.4.3.3: Creating a Framework instance
-			Framework framework = createFramework(frameworkFactory, convertFrameworkProperties(frameworkProps));
+			Framework framework = createFramework(frameworkFactory, frameworkProps);
 
 			/////////////////////////////////////////////////////////
 			// 160.4.3.4: Installing bundles and configurations
@@ -459,22 +459,6 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 				LOG.error("Framework already launched!");
 				throw new IllegalStateException("Framework already launched!");
 			}
-		}
-
-		/**
-		 * FIXME: remove once conflict between
-		 * `org.osgi.service.featurelauncher.FeatureLauncher.LaunchBuilder.withFrameworkProperties(Map<String,
-		 * Object>)` and
-		 * `org.osgi.framework.launch.FrameworkFactory.newFramework(Map<String,
-		 * String>)` is resolved
-		 **/
-		private Map<String, String> convertFrameworkProperties(Map<String, Object> frameworkProperties) {
-			if (!frameworkProperties.isEmpty()) {
-				return frameworkProperties.entrySet().stream()
-						.collect(Collectors.toMap(Map.Entry::getKey, e -> String.valueOf(e.getValue())));
-			}
-
-			return Collections.emptyMap();
 		}
 	}
 

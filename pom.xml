@@ -18,6 +18,17 @@
 			<email>mhs@into.software</email>
 		</developer>
 	</developers>
+	
+	<repositories>
+		<repository>
+			<!-- Maven's public open source snapshot repo for unreleased OSGi API -->
+			<id>OSSRH</id>
+			<url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+			<snapshots>
+				<enabled>true</enabled>
+			</snapshots>
+		</repository>
+	</repositories>
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

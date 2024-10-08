@@ -51,7 +51,7 @@ import com.kentyou.featurelauncher.impl.util.BundleStateUtil;
 public class FeatureLauncherImplTest {
 	FeatureLauncher featureLauncher;
 	Path localM2RepositoryPath;
-	Map<String, Object> frameworkProperties;
+	Map<String, String> frameworkProperties;
 	Path frameworkStorageTempDir;
 
 	@BeforeEach
@@ -65,7 +65,7 @@ public class FeatureLauncherImplTest {
 
 		// Configure framwork properties
 		frameworkStorageTempDir = Files.createTempDirectory("osgi_");
-		frameworkProperties = Map.of(Constants.FRAMEWORK_STORAGE, frameworkStorageTempDir,
+		frameworkProperties = Map.of(Constants.FRAMEWORK_STORAGE, frameworkStorageTempDir.toString(),
 				Constants.FRAMEWORK_STORAGE_CLEAN, FRAMEWORK_STORAGE_CLEAN_TESTONLY);
 
 		// Load the Feature Launcher
