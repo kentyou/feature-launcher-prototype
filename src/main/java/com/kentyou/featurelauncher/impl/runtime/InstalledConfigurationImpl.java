@@ -15,18 +15,31 @@ package com.kentyou.featurelauncher.impl.runtime;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 import org.osgi.service.feature.ID;
 import org.osgi.service.featurelauncher.runtime.InstalledConfiguration;
 
 /**
- * TODO
+ * Implementation of {@link org.osgi.service.featurelauncher.runtime.InstalledConfiguration}
  * 
  * @author Michael H. Siemaszko (mhs@into.software)
  * @since Sep 15, 2024
  */
 class InstalledConfigurationImpl implements InstalledConfiguration {
+	private final String pid;
+	private final Optional<String> factoryPid;
+	private final Map<String, Object> properties;
+	private final List<ID> owningFeatures;
+
+	public InstalledConfigurationImpl(String pid, Optional<String> factoryPid, Map<String, Object> properties,
+			List<ID> owningFeatures) {
+		this.pid = pid;
+		this.factoryPid = factoryPid;
+		this.properties = properties;
+		this.owningFeatures = owningFeatures;
+	}
 
 	/* 
 	 * (non-Javadoc)
@@ -34,8 +47,7 @@ class InstalledConfigurationImpl implements InstalledConfiguration {
 	 */
 	@Override
 	public String getPid() {
-		// TODO Auto-generated method stub
-		return null;
+		return pid;
 	}
 
 	/* 
@@ -44,8 +56,7 @@ class InstalledConfigurationImpl implements InstalledConfiguration {
 	 */
 	@Override
 	public Optional<String> getFactoryPid() {
-		// TODO Auto-generated method stub
-		return Optional.empty();
+		return factoryPid;
 	}
 
 	/* 
@@ -54,8 +65,7 @@ class InstalledConfigurationImpl implements InstalledConfiguration {
 	 */
 	@Override
 	public Map<String, Object> getProperties() {
-		// TODO Auto-generated method stub
-		return null;
+		return properties;
 	}
 
 	/* 
@@ -64,8 +74,42 @@ class InstalledConfigurationImpl implements InstalledConfiguration {
 	 */
 	@Override
 	public List<ID> getOwningFeatures() {
-		// TODO Auto-generated method stub
-		return null;
+		return owningFeatures;
 	}
 
+	/* 
+	 * (non-Javadoc)
+	 * @see java.lang.Object#hashCode()
+	 */
+	@Override
+	public int hashCode() {
+		return Objects.hash(factoryPid, owningFeatures, pid, properties);
+	}
+
+	/* 
+	 * (non-Javadoc)
+	 * @see java.lang.Object#equals(java.lang.Object)
+	 */
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		InstalledConfigurationImpl other = (InstalledConfigurationImpl) obj;
+		return Objects.equals(factoryPid, other.factoryPid) && Objects.equals(owningFeatures, other.owningFeatures)
+				&& Objects.equals(pid, other.pid) && Objects.equals(properties, other.properties);
+	}
+
+	/* 
+	 * (non-Javadoc)
+	 * @see java.lang.Object#toString()
+	 */
+	@Override
+	public String toString() {
+		return "InstalledConfigurationImpl [pid=" + pid + ", factoryPid=" + factoryPid + ", properties=" + properties
+				+ ", owningFeatures=" + owningFeatures + "]";
+	}
 }

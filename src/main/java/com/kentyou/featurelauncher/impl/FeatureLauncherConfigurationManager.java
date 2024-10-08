@@ -13,6 +13,8 @@
  */
 package com.kentyou.featurelauncher.impl;
 
+import static com.kentyou.featurelauncher.impl.util.ConfigurationUtil.*;
+
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -33,7 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Manages feature configurations via Configuration Admin Service.
+ * Manages feature configurations via Configuration Admin Service for {@link com.kentyou.featurelauncher.impl.FeatureLauncherImpl}
  * 
  * As defined in the following sections of the "160. Feature Launcher Service Specification":
  *  - 160.4.3.4
@@ -43,8 +45,8 @@ import org.slf4j.LoggerFactory;
  * @author Michael H. Siemaszko (mhs@into.software)
  * @since Sep 25, 2024
  */
-class FeatureConfigurationManager implements ServiceTrackerCustomizer<ConfigurationAdmin, Object> {
-	private static final Logger LOG = LoggerFactory.getLogger(FeatureConfigurationManager.class);
+public class FeatureLauncherConfigurationManager implements ServiceTrackerCustomizer<ConfigurationAdmin, Object> {
+	private static final Logger LOG = LoggerFactory.getLogger(FeatureLauncherConfigurationManager.class);
 
 	private static final String CONFIGURATION_ADMIN_CLASS_NAME = "org.osgi.service.cm.ConfigurationAdmin";
 	private static final String CONFIGURATION_CLASS_NAME = "org.osgi.service.cm.Configuration";
@@ -64,7 +66,7 @@ class FeatureConfigurationManager implements ServiceTrackerCustomizer<Configurat
 	private Method getConfigurationPropertiesMethod;
 	private Method updateConfigurationPropertiesMethod;
 
-	public FeatureConfigurationManager(BundleContext bundleContext,
+	public FeatureLauncherConfigurationManager(BundleContext bundleContext,
 			Map<String, FeatureConfiguration> featureConfigurations) {
 		this.bundleContext = bundleContext;
 		this.featureConfigurations = featureConfigurations;
@@ -162,7 +164,7 @@ class FeatureConfigurationManager implements ServiceTrackerCustomizer<Configurat
 			LOG.info(String.format("Creating configuration %s", featureConfigurationPid));
 
 			Object configurationObject = getConfigurationMethod.invoke(configurationAdminService,
-					featureConfiguration.getPid(), "?");
+					featureConfiguration.getPid(), CONFIGURATION_DEFAULT_LOCATION);
 
 			updateConfigurationProperties(configurationObject, featureConfigurationPid, featureConfiguration);
 
@@ -177,7 +179,7 @@ class FeatureConfigurationManager implements ServiceTrackerCustomizer<Configurat
 			LOG.info(String.format("Creating factory configuration %s", featureConfigurationPid));
 
 			Object configurationObject = getFactoryConfigurationMethod.invoke(configurationAdminService,
-					featureConfiguration.getFactoryPid().get(), featureConfiguration.getPid(), "?");
+					featureConfiguration.getFactoryPid().get(), normalizePid(featureConfiguration.getPid()), CONFIGURATION_DEFAULT_LOCATION);
 
 			updateConfigurationProperties(configurationObject, featureConfigurationPid, featureConfiguration);
 

@@ -17,6 +17,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
@@ -74,16 +75,18 @@ class LocalArtifactRepositoryImpl implements FileSystemArtifactRepository {
 
 		Path path = getArtifactM2RepoPath(id);
 
-		File file = path.toFile();
+		if (path != null) {
+			File file = path.toFile();
 
-		if (file.exists()) {
-			try {
-				return new FileInputStream(file);
-			} catch (FileNotFoundException e) {
-				LOG.error(String.format("Error getting artifact ID '%s'", id.toString()), e);
+			if (file.exists()) {
+				try {
+					return new FileInputStream(file);
+				} catch (FileNotFoundException e) {
+					LOG.error(String.format("Error getting artifact ID '%s'", id.toString()), e);
+				}
+			} else {
+				LOG.warn(String.format("Artifact ID '%s' does not exist in this repository!", id.toString()));
 			}
-		} else {
-			LOG.warn(String.format("Artifact ID '%s' does not exist in this repository!", id.toString()));
 		}
 
 		return null;
@@ -124,8 +127,14 @@ class LocalArtifactRepositoryImpl implements FileSystemArtifactRepository {
 		artifactName.append(".");
 		artifactName.append(getExtensionForType(id.getType()));
 
-		return Paths.get(projectHome.toAbsolutePath().toString(), id.getArtifactId(), id.getVersion(),
-				artifactName.toString());
+		// TODO: maybe use java.nio.file.Path.resolve(Path) instead ?
+		Path artifactM2RepoPath = Paths.get(projectHome.toAbsolutePath().toString(), id.getArtifactId(),
+				id.getVersion(), artifactName.toString());
+		if (Files.exists(artifactM2RepoPath)) {
+			return artifactM2RepoPath;
+		} else {
+			return null;
+		}
 	}
 
 	private String getExtensionForType(Optional<String> typeOptional) {
