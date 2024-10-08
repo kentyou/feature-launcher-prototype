@@ -371,7 +371,6 @@
 								org.eclipse.sisu;resolution:=optional,\
 								javax.inject;resolution:=optional,\
 								org.apache.commons.codec.binary;resolution:=optional,\
-								org.apache.commons.logging;resolution:=optional,\
 								org.ietf.jgss;resolution:=optional,\
 								*
 							-includeresource: \
