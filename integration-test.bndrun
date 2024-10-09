@@ -6,7 +6,8 @@
 	bnd.identity;id='org.glassfish.jakarta.json'
 
 -runproperties: \
-	localRepositoryPath=${project.build.directory}/m2Repo
+	localRepositoryPath=${project.build.directory}/m2Repo,\
+	gosh.args=-s
 
 -resolve.effective: active
 
@@ -22,6 +23,7 @@
 	com.fasterxml.woodstox.woodstox-core;version='[7.0.0,7.0.1)',\
 	com.kentyou.featurelauncher;version='[1.0.0,1.0.1)',\
 	com.kentyou.featurelauncher-tests;version='[1.0.0,1.0.1)',\
+	jcl.over.slf4j;version='[2.0.13,2.0.14)',\
 	junit-jupiter-api;version='[5.11.1,5.11.2)',\
 	junit-jupiter-engine;version='[5.11.1,5.11.2)',\
 	junit-jupiter-params;version='[5.11.1,5.11.2)',\
