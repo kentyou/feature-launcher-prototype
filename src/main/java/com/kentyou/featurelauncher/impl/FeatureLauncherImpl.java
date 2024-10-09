@@ -13,8 +13,6 @@
  */
 package com.kentyou.featurelauncher.impl;
 
-import static com.kentyou.featurelauncher.impl.FeatureLauncherImplConstants.FRAMEWORK_STORAGE_CLEAN_TESTONLY;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
@@ -396,7 +394,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 		}
 
 		private void cleanup(Framework framework) {
-			
+
 			// Stopping the framework will stop all of the bundles
 			try {
 				framework.stop();
@@ -404,7 +402,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			} catch (BundleException | InterruptedException e) {
 				LOG.error("A problem occurred while cleaning up the framework", e);
 			}
-			
+
 			Collections.reverse(installedBundles);
 
 			if (!installedBundles.isEmpty()) {

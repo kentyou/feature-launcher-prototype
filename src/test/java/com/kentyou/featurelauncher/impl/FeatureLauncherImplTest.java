@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceLoader;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
@@ -79,6 +80,20 @@ public class FeatureLauncherImplTest {
 		} else {
 			throw new IllegalStateException("Error loading feature launcher!");
 		}
+	}
+	
+	// The use of Gogo Shell requires that Std In is connected to a live
+	// terminal, which breaks builds using batch mode (like CI).
+	// We therefore tell gogo to be non-interactive
+	
+	@BeforeEach
+	public void replaceStdInForGogo() throws IOException {
+		System.setProperty("gosh.args", "-s");
+	}
+	
+	@AfterEach
+	public void resetStdIn() {
+		System.clearProperty("gosh.args");
 	}
 
 	@Test

@@ -6,7 +6,8 @@
 	bnd.identity;id='org.glassfish.jakarta.json'
 
 -runproperties: \
-	localRepositoryPath=${project.build.directory}/m2Repo
+	localRepositoryPath=${project.build.directory}/m2Repo,\
+	gosh.args=-s
 
 -resolve.effective: active
 
