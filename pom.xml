@@ -14,8 +14,14 @@
 
 	<developers>
 		<developer>
+			<id>ideas-into-software</id>
 			<name>Michael H. Siemaszko</name>
 			<email>mhs@into.software</email>
+		</developer>
+		<developer>
+			<id>timothyjward</id>
+			<name>Tim Ward</name>
+			<email>timothyjward@apache.org</email>
 		</developer>
 	</developers>
 	
