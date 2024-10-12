@@ -3,7 +3,8 @@
 -runrequires: \
 	bnd.identity;id='${project.groupId}.${project.artifactId}-tests',\
 	bnd.identity;id='org.apache.felix.configadmin',\
-	bnd.identity;id='org.glassfish.jakarta.json'
+	bnd.identity;id='org.glassfish.jakarta.json',\
+	bnd.identity;id='org.apache.commons.logging'
 
 -runproperties: \
 	localRepositoryPath=${project.build.directory}/m2Repo
@@ -29,6 +30,7 @@
 	junit-platform-engine;version='[1.11.1,1.11.2)',\
 	junit-platform-launcher;version='[1.11.1,1.11.2)',\
 	org.apache.aries.spifly.dynamic.framework.extension;version='[1.3.7,1.3.8)',\
+	org.apache.commons.logging;version='[1.2.0,1.2.1)',\
 	org.apache.felix.cm.json;version='[2.0.6,2.0.7)',\
 	org.apache.felix.configadmin;version='[1.9.26,1.9.27)',\
 	org.apache.felix.feature;version='[1.0.2,1.0.3)',\

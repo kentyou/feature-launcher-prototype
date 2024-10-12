@@ -26,9 +26,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.ServiceLoader;
-import java.util.stream.Collectors;
 
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
@@ -54,6 +51,7 @@ import com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryFactoryImpl
 import com.kentyou.featurelauncher.impl.util.BundleEventUtil;
 import com.kentyou.featurelauncher.impl.util.FileSystemUtil;
 import com.kentyou.featurelauncher.impl.util.FrameworkEventUtil;
+import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
 
 /**
  * 160.4 The Feature Launcher
@@ -83,7 +81,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 	public LaunchBuilder launch(Reader jsonReader) {
 		Objects.requireNonNull(jsonReader, "Feature JSON cannot be null!");
 
-		FeatureService featureService = loadFeatureService();
+		FeatureService featureService = ServiceLoaderUtil.loadFeatureService();
 
 		try {
 			Feature feature = featureService.readFeature(jsonReader);
@@ -103,7 +101,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 		private List<ArtifactRepository> artifactRepositories;
 		private Map<String, Object> configuration;
 		private Map<String, Object> variables;
-		private Map<String, Object> frameworkProps;
+		private Map<String, String> frameworkProps;
 		private List<FeatureDecorator> decorators;
 		private Map<String, FeatureExtensionHandler> extensionHandlers;
 		private FeatureLauncherConfigurationManager featureConfigurationManager;
@@ -147,7 +145,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 
 			ensureNotLaunchedYet();
 
-			this.configuration = configuration;
+			this.configuration = Map.copyOf(configuration);
 
 			return this;
 		}
@@ -162,7 +160,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 
 			ensureNotLaunchedYet();
 
-			this.variables = variables;
+			this.variables = Map.copyOf(variables);
 
 			return this;
 		}
@@ -172,12 +170,12 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 		 * @see org.osgi.service.featurelauncher.FeatureLauncher.LaunchBuilder#withFrameworkProperties(java.util.Map)
 		 */
 		@Override
-		public LaunchBuilder withFrameworkProperties(Map<String, Object> frameworkProps) {
+		public LaunchBuilder withFrameworkProperties(Map<String, String> frameworkProps) {
 			Objects.requireNonNull(frameworkProps, "Framework launch properties cannot be null!");
 
 			ensureNotLaunchedYet();
 
-			this.frameworkProps = frameworkProps;
+			this.frameworkProps = Map.copyOf(frameworkProps);
 
 			return this;
 		}
@@ -238,7 +236,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 
 			///////////////////////////////////////////
 			// 160.4.3.3: Creating a Framework instance
-			Framework framework = createFramework(frameworkFactory, convertFrameworkProperties(frameworkProps));
+			Framework framework = createFramework(frameworkFactory, frameworkProps);
 
 			/////////////////////////////////////////////////////////
 			// 160.4.3.4: Installing bundles and configurations
@@ -397,6 +395,37 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 		private void cleanup(Framework framework) {
 			Collections.reverse(installedBundles);
 
+			stopBundles();
+
+			uninstallBundles();
+
+			// TODO: count down on latch passed to builder so outside calling code knows
+			// when framework is actually "done"
+
+			maybeRemoveFrameworkStorage();
+		}
+
+		private void stopBundles() {
+			if (!installedBundles.isEmpty()) {
+				Iterator<Bundle> installedBundlesIt = installedBundles.iterator();
+				while (installedBundlesIt.hasNext()) {
+					Bundle installedBundle = installedBundlesIt.next();
+
+					try {
+						if ((installedBundle.getHeaders().get(Constants.FRAGMENT_HOST) == null)
+								&& (installedBundle.getState() != Bundle.UNINSTALLED)) {
+							installedBundle.stop();
+							LOG.info(String.format("Stopped bundle '%s'", installedBundle.getSymbolicName()));
+						}
+
+					} catch (BundleException e) {
+						LOG.error(String.format("Cannot stop bundle '%s'", installedBundle.getSymbolicName()), e);
+					}
+				}
+			}
+		}
+
+		private void uninstallBundles() {
 			if (!installedBundles.isEmpty()) {
 				Iterator<Bundle> installedBundlesIt = installedBundles.iterator();
 				while (installedBundlesIt.hasNext()) {
@@ -404,22 +433,20 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 
 					try {
 						if (installedBundle.getState() != Bundle.UNINSTALLED) {
-							installedBundle.stop();
 							installedBundle.uninstall();
 							LOG.info(String.format("Uninstalled bundle '%s'", installedBundle.getSymbolicName()));
 						}
 
 						installedBundlesIt.remove();
 
-					} catch (BundleException exc) {
-						LOG.error(String.format("Cannot uninstall bundle '%s'", installedBundle.getSymbolicName()));
+					} catch (BundleException e) {
+						LOG.error(String.format("Cannot uninstall bundle '%s'", installedBundle.getSymbolicName()), e);
 					}
 				}
 			}
+		}
 
-			// TODO: count down on latch passed to builder so outside calling code knows
-			// when framework is actually "done"
-
+		private void maybeRemoveFrameworkStorage() {
 			if (frameworkProps.containsKey(Constants.FRAMEWORK_STORAGE)
 					&& frameworkProps.containsKey(Constants.FRAMEWORK_STORAGE_CLEAN)
 					&& FRAMEWORK_STORAGE_CLEAN_TESTONLY.equals(frameworkProps.get(Constants.FRAMEWORK_STORAGE_CLEAN))) {
@@ -459,34 +486,6 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 				LOG.error("Framework already launched!");
 				throw new IllegalStateException("Framework already launched!");
 			}
-		}
-
-		/**
-		 * FIXME: remove once conflict between
-		 * `org.osgi.service.featurelauncher.FeatureLauncher.LaunchBuilder.withFrameworkProperties(Map<String,
-		 * Object>)` and
-		 * `org.osgi.framework.launch.FrameworkFactory.newFramework(Map<String,
-		 * String>)` is resolved
-		 **/
-		private Map<String, String> convertFrameworkProperties(Map<String, Object> frameworkProperties) {
-			if (!frameworkProperties.isEmpty()) {
-				return frameworkProperties.entrySet().stream()
-						.collect(Collectors.toMap(Map.Entry::getKey, e -> String.valueOf(e.getValue())));
-			}
-
-			return Collections.emptyMap();
-		}
-	}
-
-	private FeatureService loadFeatureService() {
-		ServiceLoader<FeatureService> loader = ServiceLoader.load(FeatureService.class);
-
-		Optional<FeatureService> featureServiceOptional = loader.findFirst();
-		if (featureServiceOptional.isPresent()) {
-			return featureServiceOptional.get();
-		} else {
-			LOG.error("Error loading FeatureService!");
-			throw new LaunchException("Error loading FeatureService!");
 		}
 	}
 }

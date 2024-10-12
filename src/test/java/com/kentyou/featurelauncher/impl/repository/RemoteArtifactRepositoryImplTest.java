@@ -28,8 +28,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.Map;
-import java.util.Optional;
-import java.util.ServiceLoader;
 import java.util.UUID;
 import java.util.jar.Attributes;
 import java.util.jar.JarInputStream;
@@ -41,6 +39,8 @@ import org.osgi.service.feature.FeatureService;
 import org.osgi.service.feature.ID;
 import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 import org.osgi.service.featurelauncher.repository.ArtifactRepositoryFactory;
+
+import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
 
 /**
  * Tests
@@ -68,24 +68,10 @@ public class RemoteArtifactRepositoryImplTest {
 		localM2RepositoryPath = Paths.get(System.getProperty(LOCAL_ARTIFACT_REPOSITORY_PATH));
 
 		// Load the Artifact Repository Factory
-		ServiceLoader<ArtifactRepositoryFactory> artifactRepositoryFactoryServiceLoader = ServiceLoader
-				.load(ArtifactRepositoryFactory.class);
-		Optional<ArtifactRepositoryFactory> artifactRepositoryFactoryServiceLoaderOptional = artifactRepositoryFactoryServiceLoader
-				.findFirst();
-		if (artifactRepositoryFactoryServiceLoaderOptional.isPresent()) {
-			artifactRepositoryFactory = artifactRepositoryFactoryServiceLoaderOptional.get();
-		} else {
-			throw new IllegalStateException("Error loading artifact repository factory!");
-		}
+		artifactRepositoryFactory = ServiceLoaderUtil.loadArtifactRepositoryFactoryService();
 
 		// Load the Feature Service
-		ServiceLoader<FeatureService> featureServiceLoader = ServiceLoader.load(FeatureService.class);
-		Optional<FeatureService> featureServiceLoaderOptional = featureServiceLoader.findFirst();
-		if (featureServiceLoaderOptional.isPresent()) {
-			featureService = featureServiceLoaderOptional.get();
-		} else {
-			throw new IllegalStateException("Error loading feature service!");
-		}
+		featureService = ServiceLoaderUtil.loadFeatureService();
 	}
 
 	@Test

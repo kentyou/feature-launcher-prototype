@@ -13,19 +13,12 @@
  */
 package com.kentyou.featurelauncher.impl.runtime;
 
-import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.DEFAULT_LOCAL_ARTIFACT_REPOSITORY_NAME;
-import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME;
-import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.LOCAL_ARTIFACT_REPOSITORY_PATH;
-import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.REMOTE_ARTIFACT_REPOSITORY_URI;
 import static org.osgi.service.feature.FeatureExtension.Kind.MANDATORY;
-import static org.osgi.service.featurelauncher.FeatureLauncherConstants.REMOTE_ARTIFACT_REPOSITORY_NAME;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -69,6 +62,7 @@ import org.slf4j.LoggerFactory;
 
 import com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryFactoryImpl;
 import com.kentyou.featurelauncher.impl.repository.FileSystemArtifactRepository;
+import com.kentyou.featurelauncher.impl.util.ArtifactRepositoryUtil;
 
 /**
  * 160.5 The Feature Runtime Service
@@ -113,13 +107,11 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 		this.bundleContext = context;
 
 		try {
-			this.defaultM2RepositoryPath = getDefaultM2RepositoryPath();
+			this.defaultM2RepositoryPath = ArtifactRepositoryUtil.getDefaultM2RepositoryPath();
 
 			// set up default repositories - one local repository ( .m2 ), one remote
 			// repository ( Maven Central )
-			this.defaultArtifactRepositories = Map.of(DEFAULT_LOCAL_ARTIFACT_REPOSITORY_NAME,
-					getDefaultLocalArtifactRepository(), DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME,
-					getDefaultRemoteArtifactRepository());
+			this.defaultArtifactRepositories = ArtifactRepositoryUtil.getDefaultArtifactRepositories(this, defaultM2RepositoryPath);
 
 			// collect symbolic names of bundles already present in running framework
 			this.existingBundlesSymbolicNames = getExistingBundlesSymbolicNames();
@@ -715,21 +707,5 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 		}
 
 		return existingBundlesSymbolicNames;
-	}
-
-	private ArtifactRepository getDefaultLocalArtifactRepository() throws IOException {
-		return createRepository(defaultM2RepositoryPath);
-	}
-
-	private ArtifactRepository getDefaultRemoteArtifactRepository() throws IOException {
-		return createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
-				Map.of(REMOTE_ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME,
-						LOCAL_ARTIFACT_REPOSITORY_PATH, defaultM2RepositoryPath.toString()));
-	}
-
-	private static Path getDefaultM2RepositoryPath() throws IOException {
-		File userHome = new File(System.getProperty("user.home"));
-
-		return Paths.get(userHome.getCanonicalPath(), ".m2", "repository");
 	}
 }

@@ -23,6 +23,10 @@ public class ConfigurationUtil {
 	public static final String CONFIGURATIONS_FILTER = ".featurelauncher.config";
 	public static final String CONFIGURATION_DEFAULT_LOCATION = "?";
 
+	private ConfigurationUtil() {
+		// hidden constructor
+	}
+
 	public static String constructConfigurationsFilter() {
 		StringBuilder sb = new StringBuilder();
 

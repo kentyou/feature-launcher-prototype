@@ -26,8 +26,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
-import java.util.Optional;
-import java.util.ServiceLoader;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,8 +35,11 @@ import org.osgi.framework.Constants;
 import org.osgi.framework.launch.Framework;
 import org.osgi.service.featurelauncher.FeatureLauncher;
 import org.osgi.service.featurelauncher.repository.ArtifactRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.kentyou.featurelauncher.impl.util.BundleStateUtil;
+import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
 
 /**
  * Tests {@link com.kentyou.featurelauncher.impl.FeatureLauncherImpl}
@@ -49,9 +50,11 @@ import com.kentyou.featurelauncher.impl.util.BundleStateUtil;
  * @since Sep 17, 2024
  */
 public class FeatureLauncherImplTest {
+	private static final Logger LOG = LoggerFactory.getLogger(FeatureLauncherImplTest.class);
+
 	FeatureLauncher featureLauncher;
 	Path localM2RepositoryPath;
-	Map<String, Object> frameworkProperties;
+	Map<String, String> frameworkProperties;
 	Path frameworkStorageTempDir;
 
 	@BeforeEach
@@ -65,18 +68,12 @@ public class FeatureLauncherImplTest {
 
 		// Configure framwork properties
 		frameworkStorageTempDir = Files.createTempDirectory("osgi_");
-		frameworkProperties = Map.of(Constants.FRAMEWORK_STORAGE, frameworkStorageTempDir,
+		frameworkProperties = Map.of(Constants.FRAMEWORK_STORAGE, frameworkStorageTempDir.toString(),
 				Constants.FRAMEWORK_STORAGE_CLEAN, FRAMEWORK_STORAGE_CLEAN_TESTONLY);
+		LOG.info(String.format("Temporary framework storage directory set to: %s", frameworkStorageTempDir.toString()));
 
 		// Load the Feature Launcher
-		ServiceLoader<FeatureLauncher> loader = ServiceLoader.load(FeatureLauncher.class);
-		Optional<FeatureLauncher> featureLauncherOptional = loader.findFirst();
-
-		if (featureLauncherOptional.isPresent()) {
-			featureLauncher = featureLauncherOptional.get();
-		} else {
-			throw new IllegalStateException("Error loading feature launcher!");
-		}
+		featureLauncher = ServiceLoaderUtil.loadFeatureLauncherService();
 	}
 
 	@Test
@@ -89,8 +86,8 @@ public class FeatureLauncherImplTest {
 		ArtifactRepository remoteRepository = featureLauncher.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
 				Map.of(REMOTE_ARTIFACT_REPOSITORY_NAME, "central", LOCAL_ARTIFACT_REPOSITORY_PATH,
 						localM2RepositoryPath.toString()));
-		assertNotNull(remoteRepository);		
-		
+		assertNotNull(remoteRepository);
+
 		// Read Feature JSON
 		Path featureJSONPath = Paths.get(getClass().getResource("/features/gogo-console-feature.json").toURI());
 
@@ -163,10 +160,10 @@ public class FeatureLauncherImplTest {
 
 		assertEquals("biz.aQute.gogo.commands.provider", bundles[5].getSymbolicName());
 		assertEquals("ACTIVE", BundleStateUtil.getBundleStateString(bundles[5].getState()));
-		
+
 		assertEquals("org.apache.felix.webconsole", bundles[14].getSymbolicName());
 		assertEquals("ACTIVE", BundleStateUtil.getBundleStateString(bundles[14].getState()));
-		
+
 		// Stop framework
 		osgiFramework.stop();
 		osgiFramework.waitForStop(0);

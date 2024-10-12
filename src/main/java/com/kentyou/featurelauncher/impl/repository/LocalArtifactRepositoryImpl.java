@@ -147,4 +147,13 @@ class LocalArtifactRepositoryImpl implements FileSystemArtifactRepository {
 
 		return DEFAULT_EXTENSION;
 	}
+
+	/* 
+	 * (non-Javadoc)
+	 * @see java.lang.Object#toString()
+	 */
+	@Override
+	public String toString() {
+		return "LocalArtifactRepositoryImpl [localRepositoryPath=" + localRepositoryPath + "]";
+	}
 }
