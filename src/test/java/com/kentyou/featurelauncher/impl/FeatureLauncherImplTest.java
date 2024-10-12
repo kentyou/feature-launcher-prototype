@@ -13,11 +13,11 @@
  */
 package com.kentyou.featurelauncher.impl;
 
-import static com.kentyou.featurelauncher.impl.FeatureLauncherImplConstants.FRAMEWORK_STORAGE_CLEAN_TESTONLY;
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.LOCAL_ARTIFACT_REPOSITORY_PATH;
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.REMOTE_ARTIFACT_REPOSITORY_URI;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.osgi.service.featurelauncher.FeatureLauncherConstants.REMOTE_ARTIFACT_REPOSITORY_NAME;
 
 import java.io.IOException;
@@ -27,16 +27,17 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.io.TempDir;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleException;
 import org.osgi.framework.Constants;
 import org.osgi.framework.launch.Framework;
 import org.osgi.service.featurelauncher.FeatureLauncher;
 import org.osgi.service.featurelauncher.repository.ArtifactRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.kentyou.featurelauncher.impl.util.BundleStateUtil;
 import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
@@ -50,30 +51,41 @@ import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
  * @since Sep 17, 2024
  */
 public class FeatureLauncherImplTest {
-	private static final Logger LOG = LoggerFactory.getLogger(FeatureLauncherImplTest.class);
-
 	FeatureLauncher featureLauncher;
 	Path localM2RepositoryPath;
 	Map<String, String> frameworkProperties;
+
+	@TempDir
 	Path frameworkStorageTempDir;
 
 	@BeforeEach
-	public void setUp() throws InterruptedException, IOException {
+	public void setUp(TestInfo info) throws InterruptedException, IOException {
 		// Obtain path of dedicated local Maven repository
-		if (System.getProperty(LOCAL_ARTIFACT_REPOSITORY_PATH) == null) {
-			throw new IllegalStateException("Local Maven repository is not defined!");
-		}
+		localM2RepositoryPath = Paths.get(System.getProperty(LOCAL_ARTIFACT_REPOSITORY_PATH, "target/m2Repo"));
+		assertTrue(Files.exists(localM2RepositoryPath), "No local artifact repository available at "
+				+ localM2RepositoryPath + " missing system property or maven setup.");
 
-		localM2RepositoryPath = Paths.get(System.getProperty(LOCAL_ARTIFACT_REPOSITORY_PATH));
-
-		// Configure framwork properties
-		frameworkStorageTempDir = Files.createTempDirectory("osgi_");
-		frameworkProperties = Map.of(Constants.FRAMEWORK_STORAGE, frameworkStorageTempDir.toString(),
-				Constants.FRAMEWORK_STORAGE_CLEAN, FRAMEWORK_STORAGE_CLEAN_TESTONLY);
-		LOG.info(String.format("Temporary framework storage directory set to: %s", frameworkStorageTempDir.toString()));
+		// Configure framework properties
+		System.out.println(
+				"*** Using " + frameworkStorageTempDir + " for framework storage in test " + info.getDisplayName());
+		frameworkProperties = Map.of(Constants.FRAMEWORK_STORAGE, frameworkStorageTempDir.toString());
 
 		// Load the Feature Launcher
 		featureLauncher = ServiceLoaderUtil.loadFeatureLauncherService();
+	}
+
+	// The use of Gogo Shell requires that Std In is connected to a live
+	// terminal, which breaks builds using batch mode (like CI).
+	// We therefore tell gogo to be non-interactive
+
+	@BeforeEach
+	public void replaceStdInForGogo() throws IOException {
+		System.setProperty("gosh.args", "-s");
+	}
+
+	@AfterEach
+	public void resetStdIn() {
+		System.clearProperty("gosh.args");
 	}
 
 	@Test

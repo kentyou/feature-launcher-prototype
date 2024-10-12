@@ -13,8 +13,6 @@
  */
 package com.kentyou.featurelauncher.impl;
 
-import static com.kentyou.featurelauncher.impl.FeatureLauncherImplConstants.FRAMEWORK_STORAGE_CLEAN_TESTONLY;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
@@ -225,6 +223,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			}
 
 			ensureNotLaunchedYet();
+			this.isLaunched = true;
 
 			//////////////////////////////////////
 			// TODO: 160.4.3.1: Feature Decoration
@@ -248,9 +247,12 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			// 160.4.3.5: Starting the framework
 			startFramework(framework);
 
-			waitForConfigurationAdminTrackerIfNeeded(FeatureLauncherConfigurationManager.CONFIGURATION_TIMEOUT_DEFAULT);
-
-			this.isLaunched = true;
+			try {
+				waitForConfigurationAdminTrackerIfNeeded(
+						FeatureLauncherConfigurationManager.CONFIGURATION_TIMEOUT_DEFAULT);
+			} finally {
+				stopConfigurationAdminTracker();
+			}
 
 			return framework;
 		}
@@ -278,8 +280,6 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 				// before call to framework.start()
 				startBundles();
 
-				createShutdownHook(framework);
-
 			} catch (BundleException | InterruptedException e) {
 				////////////////////////////////////
 				// 160.4.3.6: Cleanup after failure
@@ -292,6 +292,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 
 		private void startBundles() throws BundleException, InterruptedException {
 			for (Bundle installedBundle : installedBundles) {
+				LOG.debug("Starting bundle {}", installedBundle);
 				startBundle(installedBundle);
 			}
 		}
@@ -393,39 +394,17 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 		}
 
 		private void cleanup(Framework framework) {
+
+			// Stopping the framework will stop all of the bundles
+			try {
+				framework.stop();
+				framework.waitForStop(0);
+			} catch (BundleException | InterruptedException e) {
+				LOG.error("A problem occurred while cleaning up the framework", e);
+			}
+
 			Collections.reverse(installedBundles);
 
-			stopBundles();
-
-			uninstallBundles();
-
-			// TODO: count down on latch passed to builder so outside calling code knows
-			// when framework is actually "done"
-
-			maybeRemoveFrameworkStorage();
-		}
-
-		private void stopBundles() {
-			if (!installedBundles.isEmpty()) {
-				Iterator<Bundle> installedBundlesIt = installedBundles.iterator();
-				while (installedBundlesIt.hasNext()) {
-					Bundle installedBundle = installedBundlesIt.next();
-
-					try {
-						if ((installedBundle.getHeaders().get(Constants.FRAGMENT_HOST) == null)
-								&& (installedBundle.getState() != Bundle.UNINSTALLED)) {
-							installedBundle.stop();
-							LOG.info(String.format("Stopped bundle '%s'", installedBundle.getSymbolicName()));
-						}
-
-					} catch (BundleException e) {
-						LOG.error(String.format("Cannot stop bundle '%s'", installedBundle.getSymbolicName()), e);
-					}
-				}
-			}
-		}
-
-		private void uninstallBundles() {
 			if (!installedBundles.isEmpty()) {
 				Iterator<Bundle> installedBundlesIt = installedBundles.iterator();
 				while (installedBundlesIt.hasNext()) {
@@ -433,23 +412,24 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 
 					try {
 						if (installedBundle.getState() != Bundle.UNINSTALLED) {
+							installedBundle.stop();
 							installedBundle.uninstall();
 							LOG.info(String.format("Uninstalled bundle '%s'", installedBundle.getSymbolicName()));
 						}
 
 						installedBundlesIt.remove();
 
-					} catch (BundleException e) {
-						LOG.error(String.format("Cannot uninstall bundle '%s'", installedBundle.getSymbolicName()), e);
+					} catch (BundleException exc) {
+						LOG.error(String.format("Cannot uninstall bundle '%s'", installedBundle.getSymbolicName()));
 					}
 				}
 			}
-		}
 
-		private void maybeRemoveFrameworkStorage() {
-			if (frameworkProps.containsKey(Constants.FRAMEWORK_STORAGE)
-					&& frameworkProps.containsKey(Constants.FRAMEWORK_STORAGE_CLEAN)
-					&& FRAMEWORK_STORAGE_CLEAN_TESTONLY.equals(frameworkProps.get(Constants.FRAMEWORK_STORAGE_CLEAN))) {
+			// Cleaning up the storage area will uninstall any bundles left over, but we
+			// must
+			// only do it if the storage area is allowed to be cleaned at startup
+			if (frameworkProps.containsKey(Constants.FRAMEWORK_STORAGE) && Constants.FRAMEWORK_STORAGE_CLEAN_ONFIRSTINIT
+					.equals(frameworkProps.get(Constants.FRAMEWORK_STORAGE_CLEAN))) {
 				try {
 					FileSystemUtil.recursivelyDelete(
 							Paths.get(String.valueOf(frameworkProps.get(Constants.FRAMEWORK_STORAGE))));
@@ -457,28 +437,6 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 					LOG.warn("Could not delete framework storage area!", e);
 				}
 			}
-		}
-
-		private void createShutdownHook(Framework framework) {
-			Runtime.getRuntime().addShutdownHook(new Thread() {
-				@Override
-				public void run() {
-					try {
-						if (framework != null) {
-							LOG.info("Stopping framework..");
-
-							stopConfigurationAdminTracker();
-
-							cleanup(framework);
-
-							framework.stop();
-							framework.waitForStop(0);
-						}
-					} catch (Exception e) {
-						LOG.error("Error stopping framework!", e);
-					}
-				}
-			});
 		}
 
 		private void ensureNotLaunchedYet() {
