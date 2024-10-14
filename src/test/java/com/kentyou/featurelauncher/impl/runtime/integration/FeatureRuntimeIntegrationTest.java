@@ -39,6 +39,8 @@ import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.osgi.framework.ServiceReference;
 import org.osgi.service.cm.Configuration;
 import org.osgi.service.cm.ConfigurationAdmin;
@@ -176,8 +178,9 @@ public class FeatureRuntimeIntegrationTest {
 		}
 	}
 
-	@Test
-	public void testInstallFeatureWithNoConfigWithCustomRepositories(
+	@ParameterizedTest
+	@ValueSource(booleans = {true, false})
+	public void testInstallFeatureWithNoConfigWithCustomRepositories(boolean useDefault,
 			@InjectService(cardinality = 1, timeout = 5000) ServiceAware<FeatureRuntime> featureRuntimeServiceAware)
 			throws URISyntaxException, IOException {
 		assertEquals(1, featureRuntimeServiceAware.getServices().size());
@@ -201,7 +204,7 @@ public class FeatureRuntimeIntegrationTest {
 			// Install Feature using default repositories
 			// @formatter:off
 			InstalledFeature installedFeature = featureRuntimeService.install(featureReader)
-					.useDefaultRepositories(false)
+					.useDefaultRepositories(useDefault)
 					.addRepository("local", localArtifactRepository)
 					.addRepository("central", remoteRepository)
 					.install();

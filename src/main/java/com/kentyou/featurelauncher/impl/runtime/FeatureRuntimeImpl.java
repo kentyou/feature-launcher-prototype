@@ -242,7 +242,7 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 			this.feature = feature;
 			this.isCompleted = false;
 			this.useDefaultRepositories = true;
-			this.artifactRepositories = getDefaultRepositories();
+			this.artifactRepositories = new HashMap<>();
 			this.variables = new HashMap<>();
 			this.decorators = new ArrayList<>();
 			this.extensionHandlers = new HashMap<>();
@@ -259,8 +259,6 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 
 			ensureNotCompletedYet();
 
-			maybeResetDefaultRepositories();
-
 			this.artifactRepositories.put(name, repository);
 
 			return castThis();
@@ -275,8 +273,6 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 			ensureNotCompletedYet();
 
 			this.useDefaultRepositories = include;
-
-			maybeResetDefaultRepositories();
 
 			return castThis();
 		}
@@ -364,6 +360,11 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 		@Override
 		public InstalledFeature complete() throws FeatureRuntimeException {
 			this.isCompleted = true;
+
+			if(this.useDefaultRepositories) {
+				getDefaultRepositories().forEach(
+						(k,v) -> this.artifactRepositories.putIfAbsent(k, v));
+			}
 
 			return addOrUpdateFeature(feature);
 		}
@@ -584,12 +585,6 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 				throw new FeatureRuntimeException(
 						String.format("The feature %d has mandatory extensions for which are not understood",
 								unknownMandatoryFeatureExtensions.size()));
-			}
-		}
-
-		private void maybeResetDefaultRepositories() {
-			if (!this.useDefaultRepositories) {
-				this.artifactRepositories = new HashMap<>();
 			}
 		}
 
