@@ -26,8 +26,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
-import java.util.Optional;
-import java.util.ServiceLoader;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +40,7 @@ import org.osgi.service.featurelauncher.FeatureLauncher;
 import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 
 import com.kentyou.featurelauncher.impl.util.BundleStateUtil;
+import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
 
 /**
  * Tests {@link com.kentyou.featurelauncher.impl.FeatureLauncherImpl}
@@ -55,7 +54,7 @@ public class FeatureLauncherImplTest {
 	FeatureLauncher featureLauncher;
 	Path localM2RepositoryPath;
 	Map<String, String> frameworkProperties;
-	
+
 	@TempDir
 	Path frameworkStorageTempDir;
 
@@ -63,34 +62,27 @@ public class FeatureLauncherImplTest {
 	public void setUp(TestInfo info) throws InterruptedException, IOException {
 		// Obtain path of dedicated local Maven repository
 		localM2RepositoryPath = Paths.get(System.getProperty(LOCAL_ARTIFACT_REPOSITORY_PATH, "target/m2Repo"));
-		assertTrue(Files.exists(localM2RepositoryPath), "No local artifact repository available at " +
-				localM2RepositoryPath + " missing system property or maven setup.");
-		
+		assertTrue(Files.exists(localM2RepositoryPath), "No local artifact repository available at "
+				+ localM2RepositoryPath + " missing system property or maven setup.");
+
 		// Configure framework properties
-		System.out.println("*** Using " + frameworkStorageTempDir + 
-				" for framework storage in test " + info.getDisplayName());
+		System.out.println(
+				"*** Using " + frameworkStorageTempDir + " for framework storage in test " + info.getDisplayName());
 		frameworkProperties = Map.of(Constants.FRAMEWORK_STORAGE, frameworkStorageTempDir.toString());
 
 		// Load the Feature Launcher
-		ServiceLoader<FeatureLauncher> loader = ServiceLoader.load(FeatureLauncher.class);
-		Optional<FeatureLauncher> featureLauncherOptional = loader.findFirst();
-
-		if (featureLauncherOptional.isPresent()) {
-			featureLauncher = featureLauncherOptional.get();
-		} else {
-			throw new IllegalStateException("Error loading feature launcher!");
-		}
+		featureLauncher = ServiceLoaderUtil.loadFeatureLauncherService();
 	}
-	
+
 	// The use of Gogo Shell requires that Std In is connected to a live
 	// terminal, which breaks builds using batch mode (like CI).
 	// We therefore tell gogo to be non-interactive
-	
+
 	@BeforeEach
 	public void replaceStdInForGogo() throws IOException {
 		System.setProperty("gosh.args", "-s");
 	}
-	
+
 	@AfterEach
 	public void resetStdIn() {
 		System.clearProperty("gosh.args");
@@ -106,8 +98,8 @@ public class FeatureLauncherImplTest {
 		ArtifactRepository remoteRepository = featureLauncher.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
 				Map.of(REMOTE_ARTIFACT_REPOSITORY_NAME, "central", LOCAL_ARTIFACT_REPOSITORY_PATH,
 						localM2RepositoryPath.toString()));
-		assertNotNull(remoteRepository);		
-		
+		assertNotNull(remoteRepository);
+
 		// Read Feature JSON
 		Path featureJSONPath = Paths.get(getClass().getResource("/features/gogo-console-feature.json").toURI());
 
@@ -180,10 +172,10 @@ public class FeatureLauncherImplTest {
 
 		assertEquals("biz.aQute.gogo.commands.provider", bundles[5].getSymbolicName());
 		assertEquals("ACTIVE", BundleStateUtil.getBundleStateString(bundles[5].getState()));
-		
+
 		assertEquals("org.apache.felix.webconsole", bundles[14].getSymbolicName());
 		assertEquals("ACTIVE", BundleStateUtil.getBundleStateString(bundles[14].getState()));
-		
+
 		// Stop framework
 		osgiFramework.stop();
 		osgiFramework.waitForStop(0);

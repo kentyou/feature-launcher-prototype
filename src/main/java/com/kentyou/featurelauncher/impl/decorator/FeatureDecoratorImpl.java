@@ -24,7 +24,7 @@ import org.osgi.service.featurelauncher.decorator.FeatureDecorator;
  * @author Michael H. Siemaszko (mhs@into.software)
  * @since Sep 15, 2024
  */
-class FeatureDecoratorImpl implements FeatureDecorator {
+public class FeatureDecoratorImpl implements FeatureDecorator {
 
 	/* 
 	 * (non-Javadoc)

@@ -16,14 +16,12 @@ package com.kentyou.featurelauncher.impl.runtime.integration;
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.DEFAULT_LOCAL_ARTIFACT_REPOSITORY_NAME;
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME;
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.LOCAL_ARTIFACT_REPOSITORY_PATH;
-import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.REMOTE_ARTIFACT_REPOSITORY_URI;
 import static com.kentyou.featurelauncher.impl.util.ConfigurationUtil.CONFIGURATIONS_FILTER;
 import static com.kentyou.featurelauncher.impl.util.ConfigurationUtil.constructConfigurationsFilter;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.osgi.service.featurelauncher.FeatureLauncherConstants.REMOTE_ARTIFACT_REPOSITORY_NAME;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -53,6 +51,7 @@ import org.osgi.test.common.annotation.InjectService;
 import org.osgi.test.common.service.ServiceAware;
 
 import com.kentyou.featurelauncher.impl.runtime.FeatureRuntimeConfigurationManager;
+import com.kentyou.featurelauncher.impl.util.ArtifactRepositoryUtil;
 
 /**
  * Tests {@link com.kentyou.featurelauncher.impl.runtime.FeatureRuntimeImpl}
@@ -185,12 +184,12 @@ public class FeatureRuntimeIntegrationTest {
 		assertNotNull(featureRuntimeService);
 
 		// Set up a repositories
-		ArtifactRepository localArtifactRepository = featureRuntimeService.createRepository(localM2RepositoryPath);
+		ArtifactRepository localArtifactRepository = ArtifactRepositoryUtil
+				.getDefaultLocalArtifactRepository(featureRuntimeService, localM2RepositoryPath);
 		assertNotNull(localArtifactRepository);
 
-		ArtifactRepository remoteRepository = featureRuntimeService.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
-				Map.of(REMOTE_ARTIFACT_REPOSITORY_NAME, "central", LOCAL_ARTIFACT_REPOSITORY_PATH,
-						localM2RepositoryPath.toString()));
+		ArtifactRepository remoteRepository = ArtifactRepositoryUtil
+				.getDefaultRemoteArtifactRepository(featureRuntimeService, localM2RepositoryPath);
 		assertNotNull(remoteRepository);
 
 		try (InputStream featureIs = getClass().getClassLoader()

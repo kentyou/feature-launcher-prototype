@@ -14,7 +14,7 @@
 package com.kentyou.featurelauncher.impl.repository;
 
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.LOCAL_ARTIFACT_REPOSITORY_PATH;
-import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.REMOTE_ARTIFACT_REPOSITORY_TYPE;
+import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.DEFAULT_REMOTE_ARTIFACT_REPOSITORY_TYPE;
 import static org.osgi.service.featurelauncher.FeatureLauncherConstants.REMOTE_ARTIFACT_REPOSITORY_NAME;
 
 import java.io.File;
@@ -77,7 +77,7 @@ class RemoteArtifactRepositoryImpl implements FileSystemArtifactRepository {
 		// @formatter:off
 		this.remoteRepository = new RemoteRepository.Builder(
 				String.valueOf(this.configurationProperties.get(REMOTE_ARTIFACT_REPOSITORY_NAME)), 
-				REMOTE_ARTIFACT_REPOSITORY_TYPE, 
+				DEFAULT_REMOTE_ARTIFACT_REPOSITORY_TYPE, 
 				this.repositoryURI.toASCIIString())
 				.build();
 		// @formatter:on
@@ -191,5 +191,15 @@ class RemoteArtifactRepositoryImpl implements FileSystemArtifactRepository {
 				}
 			}
 		});
+	}
+
+	/* 
+	 * (non-Javadoc)
+	 * @see java.lang.Object#toString()
+	 */
+	@Override
+	public String toString() {
+		return "RemoteArtifactRepositoryImpl [repositoryURI=" + repositoryURI + ", configurationProperties="
+				+ configurationProperties + ", localRepositoryPath=" + localRepositoryPath + "]";
 	}
 }

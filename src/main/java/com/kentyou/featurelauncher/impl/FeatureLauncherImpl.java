@@ -24,8 +24,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.ServiceLoader;
 
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
@@ -51,6 +49,7 @@ import com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryFactoryImpl
 import com.kentyou.featurelauncher.impl.util.BundleEventUtil;
 import com.kentyou.featurelauncher.impl.util.FileSystemUtil;
 import com.kentyou.featurelauncher.impl.util.FrameworkEventUtil;
+import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
 
 /**
  * 160.4 The Feature Launcher
@@ -80,7 +79,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 	public LaunchBuilder launch(Reader jsonReader) {
 		Objects.requireNonNull(jsonReader, "Feature JSON cannot be null!");
 
-		FeatureService featureService = loadFeatureService();
+		FeatureService featureService = ServiceLoaderUtil.loadFeatureService();
 
 		try {
 			Feature feature = featureService.readFeature(jsonReader);
@@ -249,7 +248,8 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			startFramework(framework);
 
 			try {
-				waitForConfigurationAdminTrackerIfNeeded(FeatureLauncherConfigurationManager.CONFIGURATION_TIMEOUT_DEFAULT);
+				waitForConfigurationAdminTrackerIfNeeded(
+						FeatureLauncherConfigurationManager.CONFIGURATION_TIMEOUT_DEFAULT);
 			} finally {
 				stopConfigurationAdminTracker();
 			}
@@ -425,10 +425,10 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 				}
 			}
 
-			// Cleaning up the storage area will uninstall any bundles left over, but we must
+			// Cleaning up the storage area will uninstall any bundles left over, but we
+			// must
 			// only do it if the storage area is allowed to be cleaned at startup
-			if (frameworkProps.containsKey(Constants.FRAMEWORK_STORAGE)
-					&& Constants.FRAMEWORK_STORAGE_CLEAN_ONFIRSTINIT
+			if (frameworkProps.containsKey(Constants.FRAMEWORK_STORAGE) && Constants.FRAMEWORK_STORAGE_CLEAN_ONFIRSTINIT
 					.equals(frameworkProps.get(Constants.FRAMEWORK_STORAGE_CLEAN))) {
 				try {
 					FileSystemUtil.recursivelyDelete(
@@ -444,18 +444,6 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 				LOG.error("Framework already launched!");
 				throw new IllegalStateException("Framework already launched!");
 			}
-		}
-	}
-
-	private FeatureService loadFeatureService() {
-		ServiceLoader<FeatureService> loader = ServiceLoader.load(FeatureService.class);
-
-		Optional<FeatureService> featureServiceOptional = loader.findFirst();
-		if (featureServiceOptional.isPresent()) {
-			return featureServiceOptional.get();
-		} else {
-			LOG.error("Error loading FeatureService!");
-			throw new LaunchException("Error loading FeatureService!");
 		}
 	}
 }
