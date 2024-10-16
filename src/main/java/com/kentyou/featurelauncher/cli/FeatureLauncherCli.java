@@ -16,7 +16,7 @@ package com.kentyou.featurelauncher.cli;
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.DEFAULT_LOCAL_ARTIFACT_REPOSITORY_NAME;
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME;
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.LOCAL_ARTIFACT_REPOSITORY_PATH;
-import static org.osgi.service.featurelauncher.FeatureLauncherConstants.REMOTE_ARTIFACT_REPOSITORY_NAME;
+import static org.osgi.service.featurelauncher.repository.ArtifactRepositoryConstants.ARTIFACT_REPOSITORY_NAME;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -323,7 +323,7 @@ public class FeatureLauncherCli implements Runnable {
 
 				Map<String, Object> configurationProperties = userSpecifiedRemoteArtifactRepositoryEntry.getValue();
 				if (isLocalArtifactRepository(userSpecifiedRemoteArtifactRepositoryEntry.getKey())) {
-					configurationProperties.putIfAbsent(REMOTE_ARTIFACT_REPOSITORY_NAME,
+					configurationProperties.putIfAbsent(ARTIFACT_REPOSITORY_NAME,
 							DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME);
 				}
 				configurationProperties.putIfAbsent(LOCAL_ARTIFACT_REPOSITORY_PATH, defaultM2RepositoryPath.toString());
@@ -331,7 +331,7 @@ public class FeatureLauncherCli implements Runnable {
 				ArtifactRepository userSpecifiedRemoteArtifactRepository = artifactRepositoryFactory
 						.createRepository(userSpecifiedRemoteArtifactRepositoryEntry.getKey(), configurationProperties);
 
-				artifactRepositories.put(String.valueOf(configurationProperties.get(REMOTE_ARTIFACT_REPOSITORY_NAME)),
+				artifactRepositories.put(String.valueOf(configurationProperties.get(ARTIFACT_REPOSITORY_NAME)),
 						userSpecifiedRemoteArtifactRepository);
 			}
 		}

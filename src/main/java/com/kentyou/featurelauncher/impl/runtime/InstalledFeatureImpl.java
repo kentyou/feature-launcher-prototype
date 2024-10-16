@@ -14,9 +14,8 @@
 package com.kentyou.featurelauncher.impl.runtime;
 
 import java.util.List;
-import java.util.Objects;
 
-import org.osgi.service.feature.ID;
+import org.osgi.service.feature.Feature;
 import org.osgi.service.featurelauncher.runtime.InstalledBundle;
 import org.osgi.service.featurelauncher.runtime.InstalledConfiguration;
 import org.osgi.service.featurelauncher.runtime.InstalledFeature;
@@ -28,14 +27,14 @@ import org.osgi.service.featurelauncher.runtime.InstalledFeature;
  * @since Sep 15, 2024
  */
 class InstalledFeatureImpl implements InstalledFeature {
-	private final ID featureId;
+	private final Feature feature;
 	private final boolean isInitialLaunch;
 	private final List<InstalledBundle> installedBundles;
 	private final List<InstalledConfiguration> installedConfigurations;
 
-	public InstalledFeatureImpl(ID featureId, boolean isInitialLaunch, List<InstalledBundle> installedBundles,
+	public InstalledFeatureImpl(Feature feature, boolean isInitialLaunch, List<InstalledBundle> installedBundles,
 			List<InstalledConfiguration> installedConfigurations) {
-		this.featureId = featureId;
+		this.feature = feature;
 		this.isInitialLaunch = isInitialLaunch;
 		this.installedBundles = installedBundles;
 		this.installedConfigurations = installedConfigurations;
@@ -43,11 +42,33 @@ class InstalledFeatureImpl implements InstalledFeature {
 
 	/* 
 	 * (non-Javadoc)
-	 * @see org.osgi.service.featurelauncher.runtime.InstalledFeature#getFeatureId()
+	 * @see org.osgi.service.featurelauncher.runtime.InstalledFeature#getFeature()
 	 */
 	@Override
-	public ID getFeatureId() {
-		return featureId;
+	public Feature getFeature() {
+		return feature;
+	}
+
+	/* 
+	 * (non-Javadoc)
+	 * @see org.osgi.service.featurelauncher.runtime.InstalledFeature#getOriginalFeature()
+	 */
+	@Override
+	public Feature getOriginalFeature() {
+		// TODO once decoration is implemented this will need to return
+		// the original undecorated feature
+		return feature;
+	}
+
+	/* 
+	 * (non-Javadoc)
+	 * @see org.osgi.service.featurelauncher.runtime.InstalledFeature#getOriginalFeature()
+	 */
+	@Override
+	public boolean isDecorated() {
+		// TODO once decoration is implemented this will need to return
+		// true if the feature has been decorated
+		return false;
 	}
 
 	/* 
@@ -83,7 +104,8 @@ class InstalledFeatureImpl implements InstalledFeature {
 	 */
 	@Override
 	public int hashCode() {
-		return Objects.hash(featureId, installedBundles, installedConfigurations, isInitialLaunch);
+		// There's currently no reason to override equals and hashCode
+		return super.hashCode();
 	}
 
 	/* 
@@ -92,16 +114,8 @@ class InstalledFeatureImpl implements InstalledFeature {
 	 */
 	@Override
 	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		InstalledFeatureImpl other = (InstalledFeatureImpl) obj;
-		return Objects.equals(featureId, other.featureId) && Objects.equals(installedBundles, other.installedBundles)
-				&& Objects.equals(installedConfigurations, other.installedConfigurations)
-				&& isInitialLaunch == other.isInitialLaunch;
+		// There's currently no reason to override equals and hashCode
+		return super.equals(obj);
 	}
 
 	/* 
@@ -110,8 +124,8 @@ class InstalledFeatureImpl implements InstalledFeature {
 	 */
 	@Override
 	public String toString() {
-		return "InstalledFeatureImpl [featureId=" + featureId + ", isInitialLaunch=" + isInitialLaunch
-				+ ", installedBundles=" + installedBundles + ", installedConfigurations=" + installedConfigurations
-				+ "]";
+		return "InstalledFeatureImpl [featureId=" + feature.getID() + ", originalFeatureId=" + feature.getID() 
+				+ ", isInitialLaunch=" + isInitialLaunch + ", installedBundles=" + installedBundles
+				+ ", installedConfigurations=" + installedConfigurations + "]";
 	}
 }

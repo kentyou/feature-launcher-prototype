@@ -14,7 +14,7 @@
 package com.kentyou.featurelauncher.impl.repository;
 
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.LOCAL_ARTIFACT_REPOSITORY_PATH;
-import static org.osgi.service.featurelauncher.FeatureLauncherConstants.REMOTE_ARTIFACT_REPOSITORY_NAME;
+import static org.osgi.service.featurelauncher.repository.ArtifactRepositoryConstants.ARTIFACT_REPOSITORY_NAME;
 
 import java.net.URI;
 import java.nio.file.Path;
@@ -62,7 +62,7 @@ public class ArtifactRepositoryFactoryImpl implements ArtifactRepositoryFactory 
 
 		if (configurationProperties.isEmpty()) {
 			throw new NullPointerException("Configuration properties cannot be empty!");
-		} else if (!configurationProperties.containsKey(REMOTE_ARTIFACT_REPOSITORY_NAME)) {
+		} else if (!configurationProperties.containsKey(ARTIFACT_REPOSITORY_NAME)) {
 			throw new NullPointerException("Remote repository name is required!");
 		} else if (configurationProperties.containsKey(LOCAL_ARTIFACT_REPOSITORY_PATH)) {
 			FileSystemUtil.validateDirectory(

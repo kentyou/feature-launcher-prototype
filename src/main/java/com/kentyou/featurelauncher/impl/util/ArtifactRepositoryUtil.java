@@ -17,7 +17,7 @@ import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryCons
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME;
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.LOCAL_ARTIFACT_REPOSITORY_PATH;
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.REMOTE_ARTIFACT_REPOSITORY_URI;
-import static org.osgi.service.featurelauncher.FeatureLauncherConstants.REMOTE_ARTIFACT_REPOSITORY_NAME;
+import static org.osgi.service.featurelauncher.repository.ArtifactRepositoryConstants.ARTIFACT_REPOSITORY_NAME;
 
 import java.io.File;
 import java.io.IOException;
@@ -63,7 +63,7 @@ public class ArtifactRepositoryUtil {
 	public static ArtifactRepository getDefaultRemoteArtifactRepository(
 			ArtifactRepositoryFactory artifactRepositoryFactory, Path defaultM2RepositoryPath) throws IOException {
 		return artifactRepositoryFactory.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
-				Map.of(REMOTE_ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME,
+				Map.of(ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME,
 						LOCAL_ARTIFACT_REPOSITORY_PATH, defaultM2RepositoryPath.toString()));
 	}
 }

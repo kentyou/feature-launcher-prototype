@@ -402,7 +402,7 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 
 			boolean isInitialLaunch = false; // TODO: check if feature was installed by FeatureLauncher
 
-			InstalledFeature installedFeature = constructInstalledFeature(feature.getID(), isInitialLaunch,
+			InstalledFeature installedFeature = constructInstalledFeature(feature, isInitialLaunch,
 					installedBundles, constructInstalledConfigurations(feature));
 			installedFeatures.add(installedFeature);
 
@@ -465,17 +465,17 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 		protected InstalledFeature getInstalledFeatureById(ID featureId) {
 			// @formatter:off
 			return installedFeatures.stream()
-					.filter(f -> featureId.equals(f.getFeatureId()))
+					.filter(f -> featureId.equals(f.getFeature().getID()))
 					.findFirst()
 					.orElse(null);
 			// @formatter:on
 		}
 
-		protected InstalledFeature constructInstalledFeature(ID featureId, boolean isInitialLaunch,
+		protected InstalledFeature constructInstalledFeature(Feature feature, boolean isInitialLaunch,
 				List<InstalledBundle> installedBundles, List<InstalledConfiguration> installedConfigurations) {
 			// @formatter:off
 			return new InstalledFeatureImpl(
-					featureId, 
+					feature, 
 					isInitialLaunch,
 					installedBundles,
 					installedConfigurations);
@@ -644,7 +644,7 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 
 		removeFeatureConfigurations(featureId);
 
-		installedFeatures.removeIf(f -> featureId.equals(f.getFeatureId()));
+		installedFeatures.removeIf(f -> featureId.equals(f.getFeature().getID()));
 	}
 
 	private Deque<ID> getBundleIDsForRemoval(ID featureId) {
