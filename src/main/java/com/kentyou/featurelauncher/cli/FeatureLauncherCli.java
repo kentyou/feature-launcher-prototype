@@ -13,7 +13,6 @@
  */
 package com.kentyou.featurelauncher.cli;
 
-import static com.kentyou.featurelauncher.impl.FeatureLauncherImplConstants.FRAMEWORK_STORAGE_CLEAN_TESTONLY;
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.DEFAULT_LOCAL_ARTIFACT_REPOSITORY_NAME;
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME;
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.LOCAL_ARTIFACT_REPOSITORY_PATH;
@@ -21,16 +20,20 @@ import static org.osgi.service.featurelauncher.FeatureLauncherConstants.REMOTE_A
 
 import java.io.IOException;
 import java.io.Reader;
+import java.io.StringReader;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Stack;
 
 import org.osgi.framework.Constants;
 import org.osgi.framework.launch.Framework;
@@ -42,15 +45,19 @@ import org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler;
 import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 import org.osgi.service.featurelauncher.repository.ArtifactRepositoryFactory;
 
-import com.kentyou.featurelauncher.cli.CommandLine.ArgGroup;
-import com.kentyou.featurelauncher.cli.CommandLine.Command;
-import com.kentyou.featurelauncher.cli.CommandLine.ITypeConverter;
-import com.kentyou.featurelauncher.cli.CommandLine.Model.CommandSpec;
-import com.kentyou.featurelauncher.cli.CommandLine.Option;
-import com.kentyou.featurelauncher.cli.CommandLine.Parameters;
-import com.kentyou.featurelauncher.cli.CommandLine.Spec;
 import com.kentyou.featurelauncher.impl.util.ArtifactRepositoryUtil;
 import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
+
+import picocli.CommandLine;
+import picocli.CommandLine.ArgGroup;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.IParameterConsumer;
+import picocli.CommandLine.ITypeConverter;
+import picocli.CommandLine.Model.ArgSpec;
+import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.Option;
+import picocli.CommandLine.Parameters;
+import picocli.CommandLine.Spec;
 
 /**
  * 160.4.2.4 The Feature Launcher Command Line
@@ -86,15 +93,19 @@ public class FeatureLauncherCli implements Runnable {
 	static final String REMOTE_ARTIFACT_REPOSITORY_URI_VALUE = "REMOTE_ARTIFACT_REPOSITORY_URI";
 
 	@ArgGroup(exclusive = true, multiplicity = "1", order = -10)
-	private FeatureFile featureFile;
+	private FeatureFromJsonOrFilePath featureFromJsonOrFilePath;
 
 	@Option(names = { "-a",
-			"--artifact-repository" }, paramLabel = "uri [key=value]", description = "Specifies an artifact repository URI and optionally one "
+			"--artifact-repository" }, paramLabel = "uri,[key=value]", description = "Specifies an artifact repository URI and optionally one "
 					+ "or more configuration properties for that artifact repository, "
 					+ "such as those described in Remote Repositories on page 1381. "
 					+ "This property may be repeated to add more than one artifact "
-					+ "repository.", order = -9, mapFallbackValue = REMOTE_ARTIFACT_REPOSITORY_URI_VALUE)
-	private Map<Object, Object> remoteArtifactRepositories;
+					+ "repository.", order = -9, mapFallbackValue = REMOTE_ARTIFACT_REPOSITORY_URI_VALUE, split = ",", parameterConsumer = UserSpecifiedArtifactRepositoryParameterConsumer.class)
+	private Map<URI, Map<String, Object>> userSpecifiedArtifactRepositories;
+
+	@Option(names = {
+			"--impl-default-repos" }, description = "Use default local and remote repositories instead of defining them.")
+	private boolean useDefaultRepos;
 
 	@Option(names = { "-d", "--decorator" }, paramLabel = "class name", description = "Provides "
 			+ "the name of a decorator class that should be used when launching "
@@ -127,17 +138,15 @@ public class FeatureLauncherCli implements Runnable {
 	private Map<String, Object> configuration;
 
 	@Option(names = {
-			"--dry-run" }, description = "Evaluates all options, processes them and displays output, but does not launch framework. Hidden option used for testing", hidden = true)
+			"--impl-dry-run" }, description = "Evaluates all options, processes them and displays output, but does not launch framework. Hidden option used for testing", hidden = true)
 	private boolean dryRun;
 
 	@Spec
 	private CommandSpec commandSpec;
 
-	private FeatureService featureService;
-	private FeatureLauncher featureLauncher;
+	private static FeatureService featureService = ServiceLoaderUtil.loadFeatureService();
 
-	private Path defaultM2RepositoryPath;
-	private Map<String, ArtifactRepository> defaultArtifactRepositories;
+	private FeatureLauncher featureLauncher = ServiceLoaderUtil.loadFeatureLauncherService();
 
 	private Path defaultFrameworkStorageDir;
 
@@ -149,41 +158,22 @@ public class FeatureLauncherCli implements Runnable {
 			return;
 		}
 
-		Path featureFilePath = (featureFile.featureFilePathOption != null) ? featureFile.featureFilePathOption
-				: featureFile.featureFilePathParameter;
+		Feature feature = (featureFromJsonOrFilePath.featureFromJson != null)
+				? featureFromJsonOrFilePath.featureFromJson
+				: featureFromJsonOrFilePath.featureFromFilePath;
 
-		remoteArtifactRepositories = (remoteArtifactRepositories != null) ? remoteArtifactRepositories
+		userSpecifiedArtifactRepositories = (userSpecifiedArtifactRepositories != null)
+				? userSpecifiedArtifactRepositories
 				: Collections.emptyMap();
+
 		decorators = (decorators != null) ? decorators : Collections.emptyList();
 		extensionHandlers = (extensionHandlers != null) ? extensionHandlers : Collections.emptyMap();
 		frameworkProperties = (frameworkProperties != null) ? frameworkProperties : Collections.emptyMap();
 		variables = (variables != null) ? variables : Collections.emptyMap();
 		configuration = (configuration != null) ? configuration : Collections.emptyMap();
 
-		this.featureService = ServiceLoaderUtil.loadFeatureService();
-
-		this.featureLauncher = ServiceLoaderUtil.loadFeatureLauncherService();
-
-		Feature feature;
-
-		try (Reader featureFileReader = Files.newBufferedReader(featureFilePath)) {
-			feature = featureService.readFeature(featureFileReader);
-		} catch (IOException e) {
-			throw new FeatureLauncherCliException("Error reading feature!", e);
-		}
-
-		try {
-			this.defaultM2RepositoryPath = ArtifactRepositoryUtil.getDefaultM2RepositoryPath();
-
-			this.defaultArtifactRepositories = ArtifactRepositoryUtil.getDefaultArtifactRepositories(featureLauncher,
-					defaultM2RepositoryPath);
-
-		} catch (IOException e) {
-			throw new FeatureLauncherCliException("Could not create default artifact repositories!", e);
-		}
-
 		Map<String, ArtifactRepository> artifactRepositories = getArtifactRepositories(featureLauncher,
-				remoteArtifactRepositories, defaultArtifactRepositories);
+				userSpecifiedArtifactRepositories, useDefaultRepos);
 
 		try {
 			this.defaultFrameworkStorageDir = createDefaultFrameworkStorageDir();
@@ -207,7 +197,9 @@ public class FeatureLauncherCli implements Runnable {
 		}
 		System.out.println("------------------------------------------------------------------------");
 
-		featureLaunchBuilder.withRepository(artifactRepositories.remove(DEFAULT_LOCAL_ARTIFACT_REPOSITORY_NAME));
+		if (useDefaultRepos) {
+			featureLaunchBuilder.withRepository(artifactRepositories.remove(DEFAULT_LOCAL_ARTIFACT_REPOSITORY_NAME));
+		}
 		for (ArtifactRepository artifactRepository : artifactRepositories.values()) {
 			featureLaunchBuilder.withRepository(artifactRepository);
 		}
@@ -301,69 +293,59 @@ public class FeatureLauncherCli implements Runnable {
 	}
 
 	private Map<String, ArtifactRepository> getArtifactRepositories(ArtifactRepositoryFactory artifactRepositoryFactory,
-			Map<Object, Object> userSpecifiedRemoteArtifactRepositories,
-			Map<String, ArtifactRepository> defaultArtifactRepositories) {
+			Map<URI, Map<String, Object>> userSpecifiedRemoteArtifactRepositories, boolean useDefaultRepos) {
 
 		Map<String, ArtifactRepository> artifactRepositories = new HashMap<>();
-		artifactRepositories.put(DEFAULT_LOCAL_ARTIFACT_REPOSITORY_NAME,
-				defaultArtifactRepositories.get(DEFAULT_LOCAL_ARTIFACT_REPOSITORY_NAME));
+
+		Path defaultM2RepositoryPath;
+		try {
+			defaultM2RepositoryPath = ArtifactRepositoryUtil.getDefaultM2RepositoryPath();
+		} catch (IOException e) {
+			throw new FeatureLauncherCliException("Could not obtain default M2 artifact repository path!", e);
+		}
+
+		if (useDefaultRepos) {
+			try {
+				Map<String, ArtifactRepository> defaultArtifactRepositories = ArtifactRepositoryUtil
+						.getDefaultArtifactRepositories(featureLauncher, defaultM2RepositoryPath);
+
+				artifactRepositories.putAll(defaultArtifactRepositories);
+
+			} catch (IOException e) {
+				throw new FeatureLauncherCliException("Could not create default artifact repositories!", e);
+			}
+		}
 
 		if (!userSpecifiedRemoteArtifactRepositories.isEmpty()) {
-			Map<URI, Map<String, Object>> processedUserSpecifiedRemoteArtifactRepositories = processUserSpecifiedRemoteArtifactRepositories(
-					userSpecifiedRemoteArtifactRepositories);
 
-			System.out.println(processedUserSpecifiedRemoteArtifactRepositories);
-
-			for (Map.Entry<URI, Map<String, Object>> processedUserSpecifiedRemoteArtifactRepositoryEntry : processedUserSpecifiedRemoteArtifactRepositories
+			for (Map.Entry<URI, Map<String, Object>> userSpecifiedRemoteArtifactRepositoryEntry : userSpecifiedRemoteArtifactRepositories
 					.entrySet()) {
 
-				Map<String, Object> configurationProperties = processedUserSpecifiedRemoteArtifactRepositoryEntry
-						.getValue();
-				configurationProperties.putIfAbsent(REMOTE_ARTIFACT_REPOSITORY_NAME,
-						DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME);
+				Map<String, Object> configurationProperties = userSpecifiedRemoteArtifactRepositoryEntry.getValue();
+				if (isLocalArtifactRepository(userSpecifiedRemoteArtifactRepositoryEntry.getKey())) {
+					configurationProperties.putIfAbsent(REMOTE_ARTIFACT_REPOSITORY_NAME,
+							DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME);
+				}
 				configurationProperties.putIfAbsent(LOCAL_ARTIFACT_REPOSITORY_PATH, defaultM2RepositoryPath.toString());
 
-				ArtifactRepository userSpecifiedRemoteArtifactRepository = artifactRepositoryFactory.createRepository(
-						processedUserSpecifiedRemoteArtifactRepositoryEntry.getKey(), configurationProperties);
+				ArtifactRepository userSpecifiedRemoteArtifactRepository = artifactRepositoryFactory
+						.createRepository(userSpecifiedRemoteArtifactRepositoryEntry.getKey(), configurationProperties);
 
 				artifactRepositories.put(String.valueOf(configurationProperties.get(REMOTE_ARTIFACT_REPOSITORY_NAME)),
 						userSpecifiedRemoteArtifactRepository);
 			}
-		} else {
-			artifactRepositories.put(DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME,
-					defaultArtifactRepositories.get(DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME));
 		}
 
 		return artifactRepositories;
 	}
 
-	private Map<URI, Map<String, Object>> processUserSpecifiedRemoteArtifactRepositories(
-			Map<Object, Object> userSpecifiedRemoteArtifactRepositories) {
-		Map<URI, Map<String, Object>> processedUserSpecifiedRemoteArtifactRepositories = new HashMap<>();
-
-		URI lastFoundURI = null;
-
-		for (Map.Entry<Object, Object> userSpecifiedRemoteArtifactRepositoryEntry : userSpecifiedRemoteArtifactRepositories
-				.entrySet()) {
-			if (REMOTE_ARTIFACT_REPOSITORY_URI_VALUE
-					.equals(String.valueOf(userSpecifiedRemoteArtifactRepositoryEntry.getValue()))) {
-				lastFoundURI = URI.create(String.valueOf(userSpecifiedRemoteArtifactRepositoryEntry.getKey()));
-				processedUserSpecifiedRemoteArtifactRepositories.put(lastFoundURI, new HashMap<>());
-
-			} else if (lastFoundURI != null) {
-				Map<String, Object> configurationProperties = processedUserSpecifiedRemoteArtifactRepositories
-						.get(lastFoundURI);
-				configurationProperties.put(String.valueOf(userSpecifiedRemoteArtifactRepositoryEntry.getKey()),
-						userSpecifiedRemoteArtifactRepositoryEntry.getValue());
-			}
-		}
-
-		return processedUserSpecifiedRemoteArtifactRepositories;
+	private boolean isLocalArtifactRepository(URI uri) {
+		return "file".equals(uri.getScheme());
 	}
 
 	private Map<String, String> getDefaultFrameworkProperties(Path defaultFrameworkStorageDir) {
 		return Map.of(Constants.FRAMEWORK_STORAGE, defaultFrameworkStorageDir.toString(),
-				Constants.FRAMEWORK_STORAGE_CLEAN, FRAMEWORK_STORAGE_CLEAN_TESTONLY);
+				Constants.FRAMEWORK_STORAGE_CLEAN, Constants.FRAMEWORK_STORAGE_CLEAN_ONFIRSTINIT);
 	}
 
 	private Path createDefaultFrameworkStorageDir() throws IOException {
@@ -379,22 +361,98 @@ public class FeatureLauncherCli implements Runnable {
 		return false;
 	}
 
-	static class FeatureFile {
-		@Parameters(arity = "1", paramLabel = "feature file path", description = "Specifies "
-				+ "the location of a file containing the feature JSON. Feature files in "
-				+ "this directory: ${COMPLETION-CANDIDATES}", converter = FeatureFileConverter.class, completionCandidates = FeatureFileCompleter.class)
-		Path featureFilePathParameter;
+	private static Feature readFeature(Path featureFilePath) {
+		try (Reader featureFilePathReader = Files.newBufferedReader(featureFilePath)) {
+			return featureService.readFeature(featureFilePathReader);
+		} catch (IOException e) {
+			throw new FeatureLauncherCliException("Error reading feature from file!", e);
+		}
+	}
+
+	private static Feature readFeature(String featureJSON) {
+		try (Reader featureJSONReader = new StringReader(featureJSON)) {
+			return featureService.readFeature(featureJSONReader);
+		} catch (IOException e) {
+			throw new FeatureLauncherCliException("Error reading feature from string!", e);
+		}
+	}
+
+	static class FeatureFromJsonOrFilePath {
+		@Parameters(arity = "1", paramLabel = "<feature json>", description = "JSON representation of the Feature to be launched.", converter = FeatureFromJsonConverter.class)
+		Feature featureFromJson;
 
 		@Option(names = { "-f",
 				"--feature-file" }, arity = "1", paramLabel = "feature file path", description = "Specifies "
 						+ "the location of a file containing the feature JSON. If used "
 						+ "then the <feature json> must be omitted. This provides the "
 						+ "feature that must be launched. Feature files in this "
-						+ "directory: ${COMPLETION-CANDIDATES}", order = -10, converter = FeatureFileConverter.class, completionCandidates = FeatureFileCompleter.class)
-		Path featureFilePathOption;
+						+ "directory: ${COMPLETION-CANDIDATES}", order = -10, converter = FeatureFromFilePathConverter.class, completionCandidates = FeatureFilePathCompleter.class)
+		Feature featureFromFilePath;
 	}
 
-	static class FeatureFileCompleter implements Iterable<String> {
+	static class UserSpecifiedArtifactRepositoryParameterConsumer implements IParameterConsumer {
+
+		@Override
+		public void consumeParameters(Stack<String> args, ArgSpec argSpec, CommandSpec commandSpec) {
+			String raw = args.pop();
+			if (raw.contains(",")) {
+				List<String> rawArtifactRepositoryDefinition = new ArrayList<>(Arrays.asList(raw.split(",")));
+
+				URI artifactRepositoryURI = URI.create(rawArtifactRepositoryDefinition.remove(0));
+
+				for (String rawArtifactRepositoryConfigurationPropertyEntry : rawArtifactRepositoryDefinition) {
+					if (rawArtifactRepositoryConfigurationPropertyEntry.contains("=")) {
+
+						Map<URI, Map<String, Object>> fieldValue = new HashMap<>();
+						Map<String, Object> artifactRepositoryConfigurationProperties = new HashMap<>();
+						if (argSpec.getValue() == null) {
+							argSpec.setValue(fieldValue);
+						} else {
+							fieldValue = argSpec.getValue();
+							if (fieldValue.containsKey(artifactRepositoryURI)) {
+								artifactRepositoryConfigurationProperties = fieldValue.get(artifactRepositoryURI);
+							}
+						}
+
+						String[] artifactRepositoryConfigurationPropertyEntry = rawArtifactRepositoryConfigurationPropertyEntry
+								.split("=");
+						artifactRepositoryConfigurationProperties.put(artifactRepositoryConfigurationPropertyEntry[0],
+								artifactRepositoryConfigurationPropertyEntry[1]);
+
+						fieldValue.put(artifactRepositoryURI, artifactRepositoryConfigurationProperties);
+					}
+				}
+			}
+		}
+	}
+
+	static class FeatureFromJsonConverter implements ITypeConverter<Feature> {
+
+		@Override
+		public Feature convert(String value) throws Exception {
+			if (value == null || value.isBlank()) {
+				throw new FeatureLauncherCliException("Please provide Feature JSON!");
+			}
+
+			return readFeature(value);
+		}
+	}
+
+	static class FeatureFromFilePathConverter implements ITypeConverter<Feature> {
+
+		@Override
+		public Feature convert(String value) throws Exception {
+			Path path = Paths.get(value);
+
+			if (!isJsonFile(path)) {
+				throw new FeatureLauncherCliException("File not found! Please provide path to existing feature file");
+			}
+
+			return readFeature(path);
+		}
+	}
+
+	static class FeatureFilePathCompleter implements Iterable<String> {
 		@Override
 		public Iterator<String> iterator() {
 			try {
@@ -409,20 +467,6 @@ public class FeatureLauncherCli implements Runnable {
 				e.printStackTrace();
 			}
 			return Collections.emptyIterator();
-		}
-	}
-
-	static class FeatureFileConverter implements ITypeConverter<Path> {
-
-		@Override
-		public Path convert(String value) throws Exception {
-			Path result = Paths.get(value);
-
-			if (!isJsonFile(result)) {
-				throw new FeatureLauncherCliException("File not found! Provide path to existing feature file");
-			}
-
-			return result;
 		}
 	}
 }

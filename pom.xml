@@ -56,6 +56,7 @@
 		<maven.version>4.0.0-beta-4</maven.version>
 		<maven.resolver.version>2.0.1</maven.resolver.version>
 		<slf4j.version>2.0.11</slf4j.version>
+		<picocli.version>4.7.6</picocli.version>
 
 		<!-- default OSGi implementations' versions' -->
 		<felix.framework.version>7.0.5</felix.framework.version>
@@ -178,12 +179,16 @@
 			<artifactId>slf4j-simple</artifactId>
 			<version>${slf4j.version}</version>
 		</dependency>
-
 		<dependency>
 			<groupId>org.glassfish</groupId>
 			<artifactId>jakarta.json</artifactId>
 			<version>${glassfish.jakarta.json.version}</version>
 			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>info.picocli</groupId>
+			<artifactId>picocli</artifactId>
+			<version>${picocli.version}</version>
 		</dependency>
 
 		<!-- default OSGi framework -->

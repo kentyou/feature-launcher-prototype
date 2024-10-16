@@ -21,7 +21,9 @@ import java.net.URI;
  * @since Sep 25, 2024
  */
 public interface ArtifactRepositoryConstants {
-	static final String REMOTE_ARTIFACT_REPOSITORY_TYPE = "default";
+	static final String REMOTE_ARTIFACT_REPOSITORY_TYPE = "type";
+	
+	static final String DEFAULT_REMOTE_ARTIFACT_REPOSITORY_TYPE = "default";
 
 	static final URI REMOTE_ARTIFACT_REPOSITORY_URI = URI.create("https://repo1.maven.org/maven2/");
 
