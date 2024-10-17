@@ -220,8 +220,6 @@ public class FeatureLauncherCliTest {
 						Map.entry(REMOTE_ARTIFACT_REPOSITORY_TYPE, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_TYPE)),
 				Files.readString(FEATURE_FILE_PATH));
 
-		System.out.println(Arrays.toString(args.toArray(String[]::new)));
-
 		int exitCode = new CommandLine(new FeatureLauncherCli()).execute(args.toArray(String[]::new));
 		assertEquals(0, exitCode);
 

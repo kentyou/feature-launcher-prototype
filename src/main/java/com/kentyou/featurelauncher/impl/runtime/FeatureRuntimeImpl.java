@@ -536,10 +536,6 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 		protected void startBundles(ID featureId, List<InstalledBundle> installedBundles) {
 			for (InstalledBundle installedBundle : installedBundles) {
 				try {
-					if (installedBundle.getBundle() == null) {
-						System.out.println("startBundles: " + installedBundle.getBundleId()); // TODO: remove this
-					}
-
 					if (installedBundle.getBundle() != null) { // only if bundle was not externally installed
 						BundleRevision rev = installedBundle.getBundle().adapt(BundleRevision.class);
 						if (rev != null && (rev.getTypes() & BundleRevision.TYPE_FRAGMENT) == 0) {
@@ -553,7 +549,6 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 
 				} catch (Exception e) {
 					LOG.warn(String.format("An error occurred starting a bundle in feature %s", featureId));
-					e.printStackTrace();
 				}
 			}
 		}
