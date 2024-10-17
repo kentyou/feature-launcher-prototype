@@ -13,12 +13,13 @@
  */
 package com.kentyou.featurelauncher.impl;
 
+import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME;
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.LOCAL_ARTIFACT_REPOSITORY_PATH;
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.REMOTE_ARTIFACT_REPOSITORY_URI;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.osgi.service.featurelauncher.FeatureLauncherConstants.REMOTE_ARTIFACT_REPOSITORY_NAME;
+import static org.osgi.service.featurelauncher.repository.ArtifactRepositoryConstants.ARTIFACT_REPOSITORY_NAME;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -95,9 +96,8 @@ public class FeatureLauncherImplTest {
 		ArtifactRepository localArtifactRepository = featureLauncher.createRepository(localM2RepositoryPath);
 		assertNotNull(localArtifactRepository);
 
-		ArtifactRepository remoteRepository = featureLauncher.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
-				Map.of(REMOTE_ARTIFACT_REPOSITORY_NAME, "central", LOCAL_ARTIFACT_REPOSITORY_PATH,
-						localM2RepositoryPath.toString()));
+		ArtifactRepository remoteRepository = featureLauncher.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI, Map.of(
+				ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME, LOCAL_ARTIFACT_REPOSITORY_PATH, localM2RepositoryPath.toString()));
 		assertNotNull(remoteRepository);
 
 		// Read Feature JSON
@@ -137,9 +137,8 @@ public class FeatureLauncherImplTest {
 		ArtifactRepository localArtifactRepository = featureLauncher.createRepository(localM2RepositoryPath);
 		assertNotNull(localArtifactRepository);
 
-		ArtifactRepository remoteRepository = featureLauncher.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
-				Map.of(REMOTE_ARTIFACT_REPOSITORY_NAME, "central", LOCAL_ARTIFACT_REPOSITORY_PATH,
-						localM2RepositoryPath.toString()));
+		ArtifactRepository remoteRepository = featureLauncher.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI, Map.of(
+				ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME, LOCAL_ARTIFACT_REPOSITORY_PATH, localM2RepositoryPath.toString()));
 		assertNotNull(remoteRepository);
 
 		// Read Feature JSON
@@ -188,9 +187,8 @@ public class FeatureLauncherImplTest {
 		ArtifactRepository localArtifactRepository = featureLauncher.createRepository(localM2RepositoryPath);
 		assertNotNull(localArtifactRepository);
 
-		ArtifactRepository remoteRepository = featureLauncher.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
-				Map.of(REMOTE_ARTIFACT_REPOSITORY_NAME, "central", LOCAL_ARTIFACT_REPOSITORY_PATH,
-						localM2RepositoryPath.toString()));
+		ArtifactRepository remoteRepository = featureLauncher.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI, Map.of(
+				ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME, LOCAL_ARTIFACT_REPOSITORY_PATH, localM2RepositoryPath.toString()));
 		assertNotNull(remoteRepository);
 
 		// Read Feature JSON
@@ -231,9 +229,8 @@ public class FeatureLauncherImplTest {
 		ArtifactRepository localArtifactRepository = featureLauncher.createRepository(localM2RepositoryPath);
 		assertNotNull(localArtifactRepository);
 
-		ArtifactRepository remoteRepository = featureLauncher.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
-				Map.of(REMOTE_ARTIFACT_REPOSITORY_NAME, "central", LOCAL_ARTIFACT_REPOSITORY_PATH,
-						localM2RepositoryPath.toString()));
+		ArtifactRepository remoteRepository = featureLauncher.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI, Map.of(
+				ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME, LOCAL_ARTIFACT_REPOSITORY_PATH, localM2RepositoryPath.toString()));
 		assertNotNull(remoteRepository);
 
 		// Read Feature JSON
@@ -274,9 +271,8 @@ public class FeatureLauncherImplTest {
 		ArtifactRepository localArtifactRepository = featureLauncher.createRepository(localM2RepositoryPath);
 		assertNotNull(localArtifactRepository);
 
-		ArtifactRepository remoteRepository = featureLauncher.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
-				Map.of(REMOTE_ARTIFACT_REPOSITORY_NAME, "central", LOCAL_ARTIFACT_REPOSITORY_PATH,
-						localM2RepositoryPath.toString()));
+		ArtifactRepository remoteRepository = featureLauncher.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI, Map.of(
+				ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME, LOCAL_ARTIFACT_REPOSITORY_PATH, localM2RepositoryPath.toString()));
 		assertNotNull(remoteRepository);
 
 		// Read Feature JSON

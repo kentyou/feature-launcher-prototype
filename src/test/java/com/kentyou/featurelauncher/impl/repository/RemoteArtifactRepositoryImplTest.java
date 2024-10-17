@@ -15,11 +15,12 @@ package com.kentyou.featurelauncher.impl.repository;
 
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.LOCAL_ARTIFACT_REPOSITORY_PATH;
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.REMOTE_ARTIFACT_REPOSITORY_URI;
+import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.osgi.service.featurelauncher.FeatureLauncherConstants.REMOTE_ARTIFACT_REPOSITORY_NAME;
+import static org.osgi.service.featurelauncher.repository.ArtifactRepositoryConstants.ARTIFACT_REPOSITORY_NAME;
 
 import java.io.File;
 import java.io.IOException;
@@ -77,7 +78,7 @@ public class RemoteArtifactRepositoryImplTest {
 	@Test
 	public void testCreateRemoteArtifactRepository() throws IOException {
 		ArtifactRepository remoteRepository = artifactRepositoryFactory.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
-				Map.of(REMOTE_ARTIFACT_REPOSITORY_NAME, "central", LOCAL_ARTIFACT_REPOSITORY_PATH,
+				Map.of(ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME, LOCAL_ARTIFACT_REPOSITORY_PATH,
 						localM2RepositoryPath.toString())); // path to local repository is needed for remote repository
 															// as well
 
@@ -88,7 +89,7 @@ public class RemoteArtifactRepositoryImplTest {
 	@Test
 	public void testCreateRemoteArtifactRepositoryWithTemporaryLocalArtifactRepository() throws IOException {
 		ArtifactRepository remoteRepository = artifactRepositoryFactory.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
-				Map.of(REMOTE_ARTIFACT_REPOSITORY_NAME, "central"));
+				Map.of(ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME));
 
 		assertNotNull(remoteRepository);
 		assertTrue(remoteRepository instanceof RemoteArtifactRepositoryImpl);
@@ -126,7 +127,7 @@ public class RemoteArtifactRepositoryImplTest {
 
 		assertThrows(IllegalArgumentException.class,
 				() -> artifactRepositoryFactory.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
-						Map.of(REMOTE_ARTIFACT_REPOSITORY_NAME, "central", LOCAL_ARTIFACT_REPOSITORY_PATH,
+						Map.of(ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME, LOCAL_ARTIFACT_REPOSITORY_PATH,
 								nonExistingRepositoryPath.toString())));
 	}
 
@@ -137,14 +138,14 @@ public class RemoteArtifactRepositoryImplTest {
 
 		assertThrows(IllegalArgumentException.class,
 				() -> artifactRepositoryFactory.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
-						Map.of(REMOTE_ARTIFACT_REPOSITORY_NAME, "central", LOCAL_ARTIFACT_REPOSITORY_PATH,
+						Map.of(ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME, LOCAL_ARTIFACT_REPOSITORY_PATH,
 								tmpFile.toPath().toString())));
 	}
 
 	@Test
 	public void testGetArtifactFromRemoteArtifactRepository() throws IOException {
 		ArtifactRepository remoteRepository = artifactRepositoryFactory.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
-				Map.of(REMOTE_ARTIFACT_REPOSITORY_NAME, "central", LOCAL_ARTIFACT_REPOSITORY_PATH,
+				Map.of(ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME, LOCAL_ARTIFACT_REPOSITORY_PATH,
 						localM2RepositoryPath.toString()));
 
 		assertNotNull(remoteRepository);

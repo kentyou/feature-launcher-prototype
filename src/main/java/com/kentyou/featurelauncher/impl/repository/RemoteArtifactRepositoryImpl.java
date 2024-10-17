@@ -13,9 +13,9 @@
  */
 package com.kentyou.featurelauncher.impl.repository;
 
-import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.LOCAL_ARTIFACT_REPOSITORY_PATH;
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.DEFAULT_REMOTE_ARTIFACT_REPOSITORY_TYPE;
-import static org.osgi.service.featurelauncher.FeatureLauncherConstants.REMOTE_ARTIFACT_REPOSITORY_NAME;
+import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.LOCAL_ARTIFACT_REPOSITORY_PATH;
+import static org.osgi.service.featurelauncher.repository.ArtifactRepositoryConstants.ARTIFACT_REPOSITORY_NAME;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -76,7 +76,7 @@ class RemoteArtifactRepositoryImpl implements FileSystemArtifactRepository {
 
 		// @formatter:off
 		this.remoteRepository = new RemoteRepository.Builder(
-				String.valueOf(this.configurationProperties.get(REMOTE_ARTIFACT_REPOSITORY_NAME)), 
+				String.valueOf(this.configurationProperties.get(ARTIFACT_REPOSITORY_NAME)), 
 				DEFAULT_REMOTE_ARTIFACT_REPOSITORY_TYPE, 
 				this.repositoryURI.toASCIIString())
 				.build();
