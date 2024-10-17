@@ -20,7 +20,6 @@ import java.io.InputStream;
 import java.io.Reader;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
@@ -35,7 +34,6 @@ import java.util.Set;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
@@ -82,10 +80,9 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 	private static final Logger LOG = LoggerFactory.getLogger(FeatureRuntimeImpl.class);
 
 	@Reference
-	FeatureService featureService;
-
-	@Reference
 	FeatureRuntimeConfigurationManager featureRuntimeConfigurationManager;
+
+	private FeatureService featureService;
 
 	private BundleContext bundleContext;
 
@@ -109,7 +106,7 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 
 	// ID of the virtual external feature representing ownership of a bundle or
 	// configuration that was deployed by another management agent
-	private final ID externalFeatureId;
+	private ID externalFeatureId;
 
 	@Activate
 	public FeatureRuntimeImpl(BundleContext context) {
@@ -135,9 +132,13 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 		this.installedFeaturesToConfigurations = new HashMap<>();
 		this.installedFeatures = new ArrayList<>();
 
-		this.externalFeatureId = featureService.getIDfromMavenCoordinates(FeatureRuntimeConstants.EXTERNAL_FEATURE_ID);
-
 		LOG.info("Started FeatureRuntime!");
+	}
+
+	@Reference
+	private void setFeatureService(FeatureService featureService) {
+		this.featureService = featureService;
+		setExternalFeatureId();
 	}
 
 	/* 
@@ -410,12 +411,13 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 			// Start bundles
 			startBundles(featureId, installedBundles);
 
+			// construct installed feature
 			boolean isInitialLaunch = false; // TODO: check if feature was installed by FeatureLauncher
 
-			// update "owning features" in other 'installedFeatures'
 			InstalledFeature installedFeature = constructInstalledFeature(feature, isInitialLaunch, installedBundles,
 					installedConfigurations);
 
+			// update "owning features" in other 'installedFeatures'
 			updateInstalledFeaturesOnAddOrUpdate(installedFeature);
 
 			installedFeatures.add(installedFeature);
@@ -534,16 +536,24 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 		protected void startBundles(ID featureId, List<InstalledBundle> installedBundles) {
 			for (InstalledBundle installedBundle : installedBundles) {
 				try {
-					BundleRevision rev = installedBundle.getBundle().adapt(BundleRevision.class);
-					if (rev != null && (rev.getTypes() & BundleRevision.TYPE_FRAGMENT) == 0) {
-						// Start all but fragment bundles
-						installedBundle.getBundle().start();
-					} else {
-						LOG.info(String.format("Not starting bundle %s as it is a fragment",
-								installedBundle.getBundle().getSymbolicName()));
+					if (installedBundle.getBundle() == null) {
+						System.out.println("startBundles: " + installedBundle.getBundleId()); // TODO: remove this
 					}
+
+					if (installedBundle.getBundle() != null) { // only if bundle was not externally installed
+						BundleRevision rev = installedBundle.getBundle().adapt(BundleRevision.class);
+						if (rev != null && (rev.getTypes() & BundleRevision.TYPE_FRAGMENT) == 0) {
+							// Start all but fragment bundles
+							installedBundle.getBundle().start();
+						} else {
+							LOG.info(String.format("Not starting bundle %s as it is a fragment",
+									installedBundle.getBundle().getSymbolicName()));
+						}
+					}
+
 				} catch (Exception e) {
 					LOG.warn(String.format("An error occurred starting a bundle in feature %s", featureId));
+					e.printStackTrace();
 				}
 			}
 		}
@@ -579,7 +589,7 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 		}
 
 		protected InstalledBundle constructExternallyInstalledBundle(ID featureId, ID bundleId) {
-			return constructInstalledBundle(bundleId, installedBundlesByIdentifier.get(bundleId),
+			return constructInstalledBundle(bundleId, null, // bundle was externally installed
 					constructOwningFeatures(featureId, externalFeatureId));
 		}
 
@@ -765,8 +775,6 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 	private void removeFeature(ID featureId) {
 		// remove only those bundles which are not referenced by other features
 		Deque<ID> bundleIDsForRemoval = getBundleIDsForRemoval(featureId);
-		LOG.info(String.format("The following bundles %s are no longer required and will be removed.",
-				Arrays.toString(bundleIDsForRemoval.toArray())));
 
 		stopBundles(bundleIDsForRemoval);
 
@@ -797,7 +805,7 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 				// Add to the start of the deque, so that we reverse the install order
 				orderedBundleIDsForRemoval.addFirst(bundleToRemove);
 
-				LOG.info(String.format("Bundle %s will be removed", bundleToRemove));
+				LOG.info(String.format("Bundle %s is no longer required and will be removed", bundleToRemove));
 			}
 		}
 
@@ -894,29 +902,33 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 	private void updateInstalledFeaturesOnRemove(ID featureId) {
 		for (InstalledFeature existingFeature : installedFeatures) {
 			// @formatter:off
-			boolean isFeatureReferenced = Stream.concat(
-					existingFeature.getInstalledBundles().stream()
-						.flatMap(ib -> ib.getOwningFeatures().stream()),
-					existingFeature.getInstalledConfigurations().stream()
-						.flatMap(ic -> ic.getOwningFeatures().stream()))
+			boolean isFeatureBundlesReferenced = existingFeature.getInstalledBundles().stream()
+					.flatMap(ib -> ib.getOwningFeatures().stream())
 					.anyMatch(ofId -> featureId.equals(ofId));
 			// @formatter:on
 
-			if (isFeatureReferenced) {
+			// @formatter:off
+			boolean isFeatureConfigurationsReferenced = existingFeature.getInstalledConfigurations().stream()
+					.flatMap(ic -> ic.getOwningFeatures().stream())
+					.anyMatch(ofId -> featureId.equals(ofId));
+			// @formatter:on
+
+			if (isFeatureBundlesReferenced) {
 
 				// update bundles' "owning features"
-				List<InstalledBundle> installedFeatureBundles = existingFeature.getInstalledBundles();
-				for (InstalledBundle installedFeatureBundle : installedFeatureBundles) {
+				for (InstalledBundle installedFeatureBundle : existingFeature.getInstalledBundles()) {
 					if (installedFeatureBundle.getOwningFeatures().removeIf(ofId -> featureId.equals(ofId))) {
 						LOG.info(String.format("Removed feature %s from owning features of bundle %s", featureId,
 								installedFeatureBundle.getBundleId()));
 					}
 				}
+			}
+
+			if (isFeatureConfigurationsReferenced) {
 
 				// update configurations' "owning features"
-				List<InstalledConfiguration> installedFeatureConfigurations = existingFeature
-						.getInstalledConfigurations();
-				for (InstalledConfiguration installedFeatureConfiguration : installedFeatureConfigurations) {
+				for (InstalledConfiguration installedFeatureConfiguration : existingFeature
+						.getInstalledConfigurations()) {
 					if (installedFeatureConfiguration.getOwningFeatures().removeIf(ofId -> featureId.equals(ofId))) {
 						LOG.info(String.format("Removed feature %s from owning features of configuration %s", featureId,
 								installedFeatureConfiguration.getPid()));
@@ -934,5 +946,9 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 		}
 
 		return existingBundlesSymbolicNames;
+	}
+
+	private void setExternalFeatureId() {
+		externalFeatureId = featureService.getIDfromMavenCoordinates(FeatureRuntimeConstants.EXTERNAL_FEATURE_ID);
 	}
 }

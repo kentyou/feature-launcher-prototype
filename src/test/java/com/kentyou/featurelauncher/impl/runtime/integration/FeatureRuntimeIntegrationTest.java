@@ -276,22 +276,22 @@ public class FeatureRuntimeIntegrationTest {
 
 			assertNotNull(installedFeature.getInstalledBundles());
 			List<InstalledBundle> installedBundles = installedFeature.getInstalledBundles();
-			assertEquals(10, installedBundles.size());
+			assertEquals(14, installedBundles.size());
 
-			assertEquals("org.apache.felix.gogo.command", installedBundles.get(0).getBundle().getSymbolicName());
-			assertTrue(installedBundles.get(0).getOwningFeatures().contains(installedFeature.getFeature().getID()));
-
-			assertEquals("org.apache.felix.gogo.shell", installedBundles.get(1).getBundle().getSymbolicName());
+			assertEquals("org.apache.felix.gogo.command", installedBundles.get(1).getBundle().getSymbolicName());
 			assertTrue(installedBundles.get(1).getOwningFeatures().contains(installedFeature.getFeature().getID()));
 
-			assertEquals("org.apache.felix.gogo.runtime", installedBundles.get(2).getBundle().getSymbolicName());
+			assertEquals("org.apache.felix.gogo.shell", installedBundles.get(2).getBundle().getSymbolicName());
 			assertTrue(installedBundles.get(2).getOwningFeatures().contains(installedFeature.getFeature().getID()));
 
-			assertEquals("biz.aQute.gogo.commands.provider", installedBundles.get(3).getBundle().getSymbolicName());
+			assertEquals("org.apache.felix.gogo.runtime", installedBundles.get(3).getBundle().getSymbolicName());
 			assertTrue(installedBundles.get(3).getOwningFeatures().contains(installedFeature.getFeature().getID()));
 
-			assertEquals("org.apache.felix.webconsole", installedBundles.get(9).getBundle().getSymbolicName());
-			assertTrue(installedBundles.get(9).getOwningFeatures().contains(installedFeature.getFeature().getID()));
+			assertEquals("biz.aQute.gogo.commands.provider", installedBundles.get(4).getBundle().getSymbolicName());
+			assertTrue(installedBundles.get(4).getOwningFeatures().contains(installedFeature.getFeature().getID()));
+
+			assertEquals("org.apache.felix.webconsole", installedBundles.get(13).getBundle().getSymbolicName());
+			assertTrue(installedBundles.get(13).getOwningFeatures().contains(installedFeature.getFeature().getID()));
 
 			List<InstalledConfiguration> installedConfigurations = installedFeature.getInstalledConfigurations();
 			assertFalse(installedConfigurations.isEmpty());
@@ -405,22 +405,22 @@ public class FeatureRuntimeIntegrationTest {
 
 			assertNotNull(updatedFeature.getInstalledBundles());
 			List<InstalledBundle> installedBundles = updatedFeature.getInstalledBundles();
-			assertEquals(10, installedBundles.size());
+			assertEquals(14, installedBundles.size());
 
-			assertEquals("org.apache.felix.gogo.command", installedBundles.get(0).getBundle().getSymbolicName());
-			assertTrue(installedBundles.get(0).getOwningFeatures().contains(updatedFeature.getFeature().getID()));
-
-			assertEquals("org.apache.felix.gogo.shell", installedBundles.get(1).getBundle().getSymbolicName());
+			assertEquals("org.apache.felix.gogo.command", installedBundles.get(1).getBundle().getSymbolicName());
 			assertTrue(installedBundles.get(1).getOwningFeatures().contains(updatedFeature.getFeature().getID()));
 
-			assertEquals("org.apache.felix.gogo.runtime", installedBundles.get(2).getBundle().getSymbolicName());
+			assertEquals("org.apache.felix.gogo.shell", installedBundles.get(2).getBundle().getSymbolicName());
 			assertTrue(installedBundles.get(2).getOwningFeatures().contains(updatedFeature.getFeature().getID()));
 
-			assertEquals("biz.aQute.gogo.commands.provider", installedBundles.get(3).getBundle().getSymbolicName());
+			assertEquals("org.apache.felix.gogo.runtime", installedBundles.get(3).getBundle().getSymbolicName());
 			assertTrue(installedBundles.get(3).getOwningFeatures().contains(updatedFeature.getFeature().getID()));
 
-			assertEquals("org.apache.felix.webconsole", installedBundles.get(9).getBundle().getSymbolicName());
-			assertTrue(installedBundles.get(9).getOwningFeatures().contains(updatedFeature.getFeature().getID()));
+			assertEquals("biz.aQute.gogo.commands.provider", installedBundles.get(4).getBundle().getSymbolicName());
+			assertTrue(installedBundles.get(4).getOwningFeatures().contains(updatedFeature.getFeature().getID()));
+
+			assertEquals("org.apache.felix.webconsole", installedBundles.get(13).getBundle().getSymbolicName());
+			assertTrue(installedBundles.get(13).getOwningFeatures().contains(updatedFeature.getFeature().getID()));
 
 			List<InstalledConfiguration> installedConfigurations = updatedFeature.getInstalledConfigurations();
 			assertFalse(installedConfigurations.isEmpty());
