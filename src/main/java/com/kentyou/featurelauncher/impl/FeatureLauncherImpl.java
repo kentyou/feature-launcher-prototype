@@ -47,6 +47,8 @@ import org.slf4j.LoggerFactory;
 
 import com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryFactoryImpl;
 import com.kentyou.featurelauncher.impl.util.BundleEventUtil;
+import com.kentyou.featurelauncher.impl.util.FeatureDecoratorUtil;
+import com.kentyou.featurelauncher.impl.util.FeatureExtensionUtil;
 import com.kentyou.featurelauncher.impl.util.FileSystemUtil;
 import com.kentyou.featurelauncher.impl.util.FrameworkEventUtil;
 import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
@@ -93,7 +95,8 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 	}
 
 	class LaunchBuilderImpl implements LaunchBuilder {
-		private final Feature feature;
+		private final Feature originalFeature;
+		private Feature feature;
 		private boolean isLaunched;
 		private List<Bundle> installedBundles;
 		private List<ArtifactRepository> artifactRepositories;
@@ -107,6 +110,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 		LaunchBuilderImpl(Feature feature) {
 			Objects.requireNonNull(feature, "Feature cannot be null!");
 
+			this.originalFeature = feature;
 			this.feature = feature;
 			this.isLaunched = false;
 			this.installedBundles = new ArrayList<>();
@@ -223,10 +227,14 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			}
 
 			ensureNotLaunchedYet();
+
 			this.isLaunched = true;
 
 			//////////////////////////////////////
-			// TODO: 160.4.3.1: Feature Decoration
+			// 160.4.3.1: Feature Decoration
+			feature = FeatureDecoratorUtil.executeFeatureDecorators(feature, decorators);
+
+			feature = FeatureExtensionUtil.executeFeatureExtensionHandlers(feature, extensionHandlers);
 
 			/////////////////////////////////////////////////
 			// 160.4.3.2: Locating a framework implementation

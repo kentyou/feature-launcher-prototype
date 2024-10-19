@@ -14,7 +14,7 @@
 package com.kentyou.featurelauncher.impl.util;
 
 /**
- * Util for {@ org.osgi.service.cm.ConfigurationAdmin}
+ * Util for {@link org.osgi.service.cm.ConfigurationAdmin}
  * 
  * @author Michael H. Siemaszko (mhs@into.software)
  * @since Oct 5, 2024

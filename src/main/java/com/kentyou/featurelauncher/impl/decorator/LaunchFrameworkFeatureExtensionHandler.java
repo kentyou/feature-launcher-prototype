@@ -14,14 +14,10 @@
 package com.kentyou.featurelauncher.impl.decorator;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import org.osgi.framework.launch.FrameworkFactory;
-import org.osgi.service.feature.Feature;
 import org.osgi.service.feature.FeatureExtension;
-import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
-import org.osgi.service.featurelauncher.decorator.DecoratorBuilderFactory;
 import org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler;
 import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 
@@ -33,17 +29,6 @@ import org.osgi.service.featurelauncher.repository.ArtifactRepository;
  */
 public interface LaunchFrameworkFeatureExtensionHandler extends FeatureExtensionHandler {
 
-	default Feature handle(Feature feature, FeatureExtension extension,
-			FeatureExtensionHandlerBuilder decoratedFeatureBuilder, DecoratorBuilderFactory factory)
-			throws AbandonOperationException {
-		throw new UnsupportedOperationException(
-				"Method not implemented as it's obsolete in `LaunchFrameworkFeatureExtensionHandler`. Use the other methods defined on 'LaunchFrameworkFeatureExtensionHandler'");
-	}
-
 	Optional<FrameworkFactory> selectFrameworkFactory(FeatureExtension featureExtension,
 			List<ArtifactRepository> artifactRepositories, Optional<FrameworkFactory> defaultFrameworkFactoryOptional);
-
-	boolean hasLaunchFrameworkFeatureExtension(Map<String, FeatureExtension> featureExtensions);
-
-	boolean isLaunchFrameworkFeatureExtensionMandatory(FeatureExtension featureExtension);
 }

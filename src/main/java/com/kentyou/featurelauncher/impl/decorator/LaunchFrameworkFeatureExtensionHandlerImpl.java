@@ -13,22 +13,22 @@
  */
 package com.kentyou.featurelauncher.impl.decorator;
 
-import static org.osgi.service.featurelauncher.FeatureLauncherConstants.LAUNCH_FRAMEWORK;
-
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.stream.Collectors;
 
 import org.osgi.framework.launch.FrameworkFactory;
+import org.osgi.service.feature.Feature;
 import org.osgi.service.feature.FeatureArtifact;
 import org.osgi.service.feature.FeatureExtension;
 import org.osgi.service.feature.ID;
+import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
+import org.osgi.service.featurelauncher.decorator.DecoratorBuilderFactory;
 import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,6 +43,25 @@ import com.kentyou.featurelauncher.impl.repository.FileSystemArtifactRepository;
  */
 public class LaunchFrameworkFeatureExtensionHandlerImpl implements LaunchFrameworkFeatureExtensionHandler {
 	private static final Logger LOG = LoggerFactory.getLogger(LaunchFrameworkFeatureExtensionHandlerImpl.class);
+
+	/* 
+	 * (non-Javadoc)
+	 * @see org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler#handle(org.osgi.service.feature.Feature, org.osgi.service.feature.FeatureExtension, org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler.FeatureExtensionHandlerBuilder, org.osgi.service.featurelauncher.decorator.DecoratorBuilderFactory)
+	 */
+	@Override
+	public Feature handle(Feature feature, FeatureExtension extension,
+			FeatureExtensionHandlerBuilder decoratedFeatureBuilder, DecoratorBuilderFactory factory)
+			throws AbandonOperationException {
+
+		/**
+		 * just return the original feature - other methods defined on
+		 * {@link com.kentyou.featurelauncher.impl.decorator.LaunchFrameworkFeatureExtensionHandler}
+		 * are used when called via
+		 * {@link com.kentyou.featurelauncher.impl.FrameworkFactoryLocator.locateFrameworkFactory(Feature,
+		 * List<ArtifactRepository>)}
+		 **/
+		return feature;
+	}
 
 	/* 
 	 * (non-Javadoc)
@@ -97,29 +116,6 @@ public class LaunchFrameworkFeatureExtensionHandlerImpl implements LaunchFramewo
 		}
 
 		return selectedFrameworkFactoryOptional;
-	}
-
-	/* 
-	 * (non-Javadoc)
-	 * @see com.kentyou.featurelauncher.impl.decorator.LaunchFrameworkFeatureExtensionHandler#hasLaunchFrameworkFeatureExtension(java.util.Map)
-	 */
-	@Override
-	public boolean hasLaunchFrameworkFeatureExtension(Map<String, FeatureExtension> featureExtensions) {
-		if (!featureExtensions.isEmpty() && featureExtensions.containsKey(LAUNCH_FRAMEWORK)) {
-			return ((featureExtensions.get(LAUNCH_FRAMEWORK).getType() == FeatureExtension.Type.ARTIFACTS)
-					&& !featureExtensions.get(LAUNCH_FRAMEWORK).getArtifacts().isEmpty());
-		}
-
-		return false;
-	}
-
-	/* 
-	 * (non-Javadoc)
-	 * @see com.kentyou.featurelauncher.impl.decorator.LaunchFrameworkFeatureExtensionHandler#isLaunchFrameworkFeatureExtensionMandatory(org.osgi.service.feature.FeatureExtension)
-	 */
-	@Override
-	public boolean isLaunchFrameworkFeatureExtensionMandatory(FeatureExtension featureExtension) {
-		return featureExtension.getKind() == FeatureExtension.Kind.MANDATORY;
 	}
 
 	private Path getArtifactPath(ID artifactId, List<ArtifactRepository> artifactRepositories) {
