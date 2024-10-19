@@ -27,7 +27,7 @@ import org.osgi.service.featurelauncher.LaunchException;
 import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
 import org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler;
 
-import com.kentyou.featurelauncher.impl.decorator.BundleStartLevelsFeatureExtensionHandler;
+import com.kentyou.featurelauncher.impl.decorator.BundleStartLevelsFeatureExtensionHandlerImpl;
 import com.kentyou.featurelauncher.impl.decorator.DecoratorBuilderFactoryImpl;
 import com.kentyou.featurelauncher.impl.decorator.FeatureExtensionHandlerBuilderImpl;
 import com.kentyou.featurelauncher.impl.decorator.FrameworkLaunchingPropertiesFeatureExtensionHandlerImpl;
@@ -45,7 +45,7 @@ public class FeatureExtensionUtil {
 	private static final Map<String, FeatureExtensionHandler> EXTENSION_TO_BUILTIN_HANDLER_MAP = Map.ofEntries(
 			Map.entry(LAUNCH_FRAMEWORK, new LaunchFrameworkFeatureExtensionHandlerImpl()),
 			Map.entry(FRAMEWORK_LAUNCHING_PROPERTIES, new FrameworkLaunchingPropertiesFeatureExtensionHandlerImpl()),
-			Map.entry(BUNDLE_START_LEVELS, new BundleStartLevelsFeatureExtensionHandler()));
+			Map.entry(BUNDLE_START_LEVELS, new BundleStartLevelsFeatureExtensionHandlerImpl()));
 	// @formatter:on
 
 	private FeatureExtensionUtil() {
@@ -95,7 +95,7 @@ public class FeatureExtensionUtil {
 
 			} else if (FeatureExtensionUtil.isExtensionMandatory(featureExtension)) {
 				throw new LaunchException(
-						String.format("Feature extension handler for extension %s not found!", extensionName));
+						String.format("Feature extension handler for mandatory extension %s not found!", extensionName));
 			}
 		}
 

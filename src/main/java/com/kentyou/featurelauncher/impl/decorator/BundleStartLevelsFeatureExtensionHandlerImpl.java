@@ -20,65 +20,40 @@ import org.osgi.service.featurelauncher.decorator.DecoratorBuilderFactory;
 import org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler;
 
 /**
- * Handler for {@link org.osgi.service.featurelauncher.FeatureLauncherConstants.FRAMEWORK_LAUNCHING_PROPERTIES} {@link org.osgi.service.feature.FeatureExtension}
+ * Handler for {@link org.osgi.service.featurelauncher.FeatureLauncherConstants.BUNDLE_START_LEVELS} {@link org.osgi.service.feature.FeatureExtension}
  * 
  * @author Michael H. Siemaszko (mhs@into.software)
  * @since Oct 19, 2024
  */
-public class FrameworkLaunchingPropertiesFeatureExtensionHandlerImpl implements FeatureExtensionHandler {
+public class BundleStartLevelsFeatureExtensionHandlerImpl implements FeatureExtensionHandler {
 
 	/*
+	 * 160.3.2 Setting the bundle start levels
 	 * 
-	 * 159.8 Framework Launching Properties
+	 * An OSGi framework contains a number of bundles which collaborate to produce a
+	 * functioning application. There are times when some bundles require the system
+	 * to have reached a certain state before they can be started. To address this
+	 * use case the OSGi framework has the concept of start levels as described in
+	 * the Start Level API Specification chapter of OSGi Core Release 8.
 	 * 
-	 * When a Feature is launched in an OSGi framework it may be necessary to
-	 * specify Framework Properties. These are provided in the Framework Launching
-	 * Properties extension section of the Feature. The Launcher must be able to
-	 * satisfy the specified properties. If it cannot ensure that these are present
-	 * in the running Framework the launcher must fail.
+	 * Setting the initial start level for the OSGi framework when bootstrapping can
+	 * easily be achieved using the framework launch property
+	 * org.osgi.framework.startlevel.beginning as defined by the OSGi core
+	 * specification.
 	 * 
-	 * Framework Launching Properties can reference Variables as defined in
-	 * Variables on page 76.
+	 * Controlling the start levels assigned to the bundles in a feature is managed
+	 * through the use of Feature Bundle metadata. Specifically the Feature Launcher
+	 * will look for a Feature Bundle metadata property named
+	 * BUNDLE_START_LEVEL_METADATA which is of type integer and has a value between
+	 * 1 and Integer.MAX_VALUE inclusive. If the property does not exist then the
+	 * default start level will be used. If the property does exist and is not a
+	 * suitable integer then launching must fail with a LaunchException.
 	 * 
-	 * These variables are substituted before the properties are set.
-	 * 
-	 * (...)
-	 * 
-	 */
-
-	/*
-	 * 160.4.2.1 Providing Framework Launch Properties
-	 * 
-	 * (...)
-	 * 
-	 * Feature definitions that require particular framework launch properties can
-	 * define them using a Feature Extension named FRAMEWORK_LAUNCHING_PROPERTIES.
-	 * The Type of this Feature Extension must be JSON, where the value is a single
-	 * JSON object. Each JSON property in this object represents a single Framework
-	 * Launch Property. The name of each JSON property must be used as the name of a
-	 * Framework Launch Property, unless the name starts with a single underscore _.
-	 * The value of each property is used as the value of the Framework Launch
-	 * Property, and must be a scalar type, that is a JSON string, number or
-	 * boolean. If the value is a different JSON type then this must be treated as
-	 * an error.
-	 * 
-	 * If the JSON property starts with a single underscore then it may be used for
-	 * implementation specific behaviour, with the prefix _osgi reserved for future
-	 * specifications. Implementation specific behaviours may permit JSON values to
-	 * be any value JSON type
-	 * 
-	 * If users require their Framework Launch Property name to start with an
-	 * underscore then they must use two underscores __ in the JSON property name.
-	 * When the implementation detects more than one underscore at the beginning of
-	 * a JSON property defined in this extension the leading underscore must be
-	 * removed, and the remaining string used as the Framework Launch Property name.
-	 * 
-	 * All implementations of the Feature Launcher must support this extension, and
-	 * use it to populate the Framework Launch Properties. The version of this
-	 * extension is 1.0.0, and may be declared in the extension JSON using the
-	 * property FRAMEWORK_LAUNCHING_PROPERTIES_VERSION.
-	 * 
-	 * (...)
+	 * Setting the default start level for the bundles, and the minimum start level
+	 * required for an installed Feature is accomplished by using a Feature
+	 * Extension named BUNDLE_START_LEVELS with Type JSON. The JSON contained in
+	 * this extension is used to configure the default start level for the bundles,
+	 * and the target start level for the framework. (...)
 	 */
 
 	/* 
