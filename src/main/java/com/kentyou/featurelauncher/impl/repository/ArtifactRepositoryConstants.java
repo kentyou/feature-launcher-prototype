@@ -16,20 +16,23 @@ package com.kentyou.featurelauncher.impl.repository;
 import java.net.URI;
 
 /**
+ * Defines additional constants for artifact repositories, supplementing those
+ * defined in {@link org.osgi.service.featurelauncher.FeatureLauncherConstants}
+ * and {@link org.osgi.service.featurelauncher.runtime.FeatureRuntimeConstants}
  * 
- * @author michal
+ * @author Michael H. Siemaszko (mhs@into.software)
  * @since Sep 25, 2024
  */
 public interface ArtifactRepositoryConstants {
 	static final String REMOTE_ARTIFACT_REPOSITORY_TYPE = "type";
-	
+
 	static final String DEFAULT_REMOTE_ARTIFACT_REPOSITORY_TYPE = "default";
 
 	static final URI REMOTE_ARTIFACT_REPOSITORY_URI = URI.create("https://repo1.maven.org/maven2/");
 
 	static final String LOCAL_ARTIFACT_REPOSITORY_PATH = "localRepositoryPath";
-	
+
 	static final String DEFAULT_LOCAL_ARTIFACT_REPOSITORY_NAME = "local";
-	
+
 	static final String DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME = "central";
 }

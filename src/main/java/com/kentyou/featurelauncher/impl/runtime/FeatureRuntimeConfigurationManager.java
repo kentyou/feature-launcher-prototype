@@ -41,7 +41,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Manages feature configurations via Configuration Admin Service for {@link com.kentyou.featurelauncher.impl.runtime.FeatureRuntimeImpl}
+ * Manages feature configurations via Configuration Admin Service for
+ * {@link com.kentyou.featurelauncher.impl.runtime.FeatureRuntimeImpl}
  * 
  * As defined in the following sections of the "160. Feature Launcher Service Specification":
  *  - 160.4.3.4
@@ -64,7 +65,7 @@ public class FeatureRuntimeConfigurationManager {
 
 	public void removeConfigurations(Set<String> featuresConfigurationsPids) {
 		try {
-			Map<String, Configuration> existingConfigurations = getExistingConfigurations();
+			Map<String, Configuration> existingConfigurations = getFeatureLauncherConfigurations();
 
 			if (!existingConfigurations.isEmpty()) {
 				for (String featuresConfigurationsPid : featuresConfigurationsPids) {
@@ -94,7 +95,16 @@ public class FeatureRuntimeConfigurationManager {
 		return Collections.emptyList();
 	}
 
-	private void createConfiguration(FeatureConfiguration featureConfiguration) {
+	public Map<String, Configuration> getAllConfigurations() throws IOException, InvalidSyntaxException {
+		// @formatter:off
+		return Optional.ofNullable(configurationAdmin.listConfigurations(null))
+				.map(Arrays::stream)
+				.map(s -> s.collect(Collectors.toMap(Configuration::getPid, Function.identity())))
+				.orElse(Map.of());
+		// @formatter:on
+	}
+
+	public void createConfiguration(FeatureConfiguration featureConfiguration) {
 		if (featureConfiguration.getFactoryPid().isPresent()) {
 			createFactoryConfiguration(featureConfiguration);
 			return;
@@ -140,7 +150,7 @@ public class FeatureRuntimeConfigurationManager {
 		}
 	}
 
-	private Map<String, Configuration> getExistingConfigurations() throws IOException, InvalidSyntaxException {
+	private Map<String, Configuration> getFeatureLauncherConfigurations() throws IOException, InvalidSyntaxException {
 		// @formatter:off
 		return Optional.ofNullable(configurationAdmin.listConfigurations(constructConfigurationsFilter()))
 				.map(Arrays::stream)

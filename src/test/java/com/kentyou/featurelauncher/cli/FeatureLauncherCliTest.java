@@ -20,7 +20,7 @@ import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryCons
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.REMOTE_ARTIFACT_REPOSITORY_URI;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.osgi.service.featurelauncher.FeatureLauncherConstants.REMOTE_ARTIFACT_REPOSITORY_NAME;
+import static org.osgi.service.featurelauncher.repository.ArtifactRepositoryConstants.ARTIFACT_REPOSITORY_NAME;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -190,15 +190,10 @@ public class FeatureLauncherCliTest {
 	@Test
 	public void testArtifactRepositoryOptionShort() throws IOException {
 		List<String> args = List.of("--impl-dry-run",
-				// FIXME: Constant
-				// `org.osgi.service.featurelauncher.FeatureLauncherConstants.REMOTE_ARTIFACT_REPOSITORY_NAME`
-				// should be changed to
-				// `org.osgi.service.featurelauncher.FeatureLauncherConstants.ARTIFACT_REPOSITORY_NAME`
-				// as both remote AND local repositories need name
 				buildArtifactRepositoryOptionArgs(false, LOCAL_ARTIFACT_REPOSITORY_URI,
-						Map.entry(REMOTE_ARTIFACT_REPOSITORY_NAME, DEFAULT_LOCAL_ARTIFACT_REPOSITORY_NAME)),
+						Map.entry(ARTIFACT_REPOSITORY_NAME, DEFAULT_LOCAL_ARTIFACT_REPOSITORY_NAME)),
 				buildArtifactRepositoryOptionArgs(false, REMOTE_ARTIFACT_REPOSITORY_URI,
-						Map.entry(REMOTE_ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME),
+						Map.entry(ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME),
 						Map.entry(REMOTE_ARTIFACT_REPOSITORY_TYPE, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_TYPE)),
 				Files.readString(FEATURE_FILE_PATH));
 
@@ -218,19 +213,12 @@ public class FeatureLauncherCliTest {
 	@Test
 	public void testArtifactRepositoryOptionLong() throws IOException {
 		List<String> args = List.of("--impl-dry-run",
-				// FIXME: Constant
-				// `org.osgi.service.featurelauncher.FeatureLauncherConstants.REMOTE_ARTIFACT_REPOSITORY_NAME`
-				// should be changed to
-				// `org.osgi.service.featurelauncher.FeatureLauncherConstants.ARTIFACT_REPOSITORY_NAME`
-				// as both remote AND local repositories need name
 				buildArtifactRepositoryOptionArgs(true, LOCAL_ARTIFACT_REPOSITORY_URI,
-						Map.entry(REMOTE_ARTIFACT_REPOSITORY_NAME, DEFAULT_LOCAL_ARTIFACT_REPOSITORY_NAME)),
+						Map.entry(ARTIFACT_REPOSITORY_NAME, DEFAULT_LOCAL_ARTIFACT_REPOSITORY_NAME)),
 				buildArtifactRepositoryOptionArgs(true, REMOTE_ARTIFACT_REPOSITORY_URI,
-						Map.entry(REMOTE_ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME),
+						Map.entry(ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME),
 						Map.entry(REMOTE_ARTIFACT_REPOSITORY_TYPE, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_TYPE)),
 				Files.readString(FEATURE_FILE_PATH));
-
-		System.out.println(Arrays.toString(args.toArray(String[]::new)));
 
 		int exitCode = new CommandLine(new FeatureLauncherCli()).execute(args.toArray(String[]::new));
 		assertEquals(0, exitCode);
