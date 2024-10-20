@@ -49,6 +49,8 @@ import org.osgi.service.feature.FeatureBundle;
 import org.osgi.service.feature.FeatureConfiguration;
 import org.osgi.service.feature.FeatureService;
 import org.osgi.service.feature.ID;
+import org.osgi.service.featurelauncher.LaunchException;
+import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
 import org.osgi.service.featurelauncher.decorator.FeatureDecorator;
 import org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler;
 import org.osgi.service.featurelauncher.repository.ArtifactRepository;
@@ -63,9 +65,13 @@ import org.osgi.service.featurelauncher.runtime.RuntimeConfigurationMerge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.kentyou.featurelauncher.impl.decorator.DecoratorBuilderFactoryImpl;
+import com.kentyou.featurelauncher.impl.decorator.FeatureDecoratorBuilderImpl;
 import com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryFactoryImpl;
 import com.kentyou.featurelauncher.impl.repository.FileSystemArtifactRepository;
 import com.kentyou.featurelauncher.impl.util.ArtifactRepositoryUtil;
+import com.kentyou.featurelauncher.impl.util.FeatureDecoratorUtil;
+import com.kentyou.featurelauncher.impl.util.FeatureExtensionUtil;
 
 /**
  * 160.5 The Feature Runtime Service
@@ -87,6 +93,7 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 	private BundleContext bundleContext;
 
 	private final Path defaultM2RepositoryPath;
+
 	private final Map<String, ArtifactRepository> defaultArtifactRepositories;
 
 	// Bundles installed by this feature runtime
@@ -231,7 +238,8 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 	}
 
 	abstract class AbstractOperationBuilderImpl<T extends OperationBuilder<T>> implements OperationBuilder<T> {
-		private final Feature feature;
+		private final Feature originalFeature;
+		private Feature feature;
 		private boolean isCompleted;
 		private boolean useDefaultRepositories;
 		private Map<String, ArtifactRepository> artifactRepositories;
@@ -244,6 +252,7 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 		public AbstractOperationBuilderImpl(Feature feature) {
 			Objects.requireNonNull(feature, "Feature cannot be null!");
 
+			this.originalFeature = feature;
 			this.feature = feature;
 			this.isCompleted = false;
 			this.useDefaultRepositories = true;
@@ -403,6 +412,11 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 				}
 			}
 
+			// Feature Decoration
+			feature = FeatureDecoratorUtil.executeFeatureDecorators(feature, decorators);
+
+			feature = FeatureExtensionUtil.executeFeatureExtensionHandlers(feature, extensionHandlers);
+
 			// Install bundles
 			List<InstalledBundle> installedBundles = installBundles(feature, featureBundles);
 
@@ -424,6 +438,21 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 			installedFeatures.add(installedFeature);
 
 			return installedFeature;
+		}
+
+		protected Feature maybeExecuteFeatureDecorators(Feature feature) {
+			if (!decorators.isEmpty()) {
+				for (FeatureDecorator decorator : decorators) {
+					try {
+						feature = decorator.decorate(feature, new FeatureDecoratorBuilderImpl(feature),
+								new DecoratorBuilderFactoryImpl());
+					} catch (AbandonOperationException e) {
+						throw new LaunchException("Feature Decoration handling failed!", e);
+					}
+				}
+			}
+
+			return feature;
 		}
 
 		protected List<InstalledBundle> installBundles(Feature feature, List<ID> featureBundles) {

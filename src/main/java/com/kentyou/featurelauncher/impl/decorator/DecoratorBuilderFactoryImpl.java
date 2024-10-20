@@ -19,16 +19,20 @@ import org.osgi.service.feature.FeatureConfigurationBuilder;
 import org.osgi.service.feature.FeatureExtension.Kind;
 import org.osgi.service.feature.FeatureExtension.Type;
 import org.osgi.service.feature.FeatureExtensionBuilder;
+import org.osgi.service.feature.FeatureService;
 import org.osgi.service.feature.ID;
 import org.osgi.service.featurelauncher.decorator.DecoratorBuilderFactory;
 
+import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
+
 /**
- * TODO
+ * Implementation of {@link org.osgi.service.featurelauncher.decorator.DecoratorBuilderFactory}
  * 
  * @author Michael H. Siemaszko (mhs@into.software)
  * @since Sep 15, 2024
  */
-class DecoratorBuilderFactoryImpl implements DecoratorBuilderFactory {
+public class DecoratorBuilderFactoryImpl implements DecoratorBuilderFactory {
+	private static FeatureService featureService = ServiceLoaderUtil.loadFeatureService();
 
 	/* 
 	 * (non-Javadoc)
@@ -36,8 +40,7 @@ class DecoratorBuilderFactoryImpl implements DecoratorBuilderFactory {
 	 */
 	@Override
 	public FeatureArtifactBuilder newArtifactBuilder(ID id) {
-		// TODO Auto-generated method stub
-		return null;
+		return featureService.getBuilderFactory().newArtifactBuilder(id);
 	}
 
 	/* 
@@ -46,8 +49,7 @@ class DecoratorBuilderFactoryImpl implements DecoratorBuilderFactory {
 	 */
 	@Override
 	public FeatureBundleBuilder newBundleBuilder(ID id) {
-		// TODO Auto-generated method stub
-		return null;
+		return featureService.getBuilderFactory().newBundleBuilder(id);
 	}
 
 	/* 
@@ -56,8 +58,7 @@ class DecoratorBuilderFactoryImpl implements DecoratorBuilderFactory {
 	 */
 	@Override
 	public FeatureConfigurationBuilder newConfigurationBuilder(String pid) {
-		// TODO Auto-generated method stub
-		return null;
+		return featureService.getBuilderFactory().newConfigurationBuilder(pid);
 	}
 
 	/* 
@@ -66,8 +67,7 @@ class DecoratorBuilderFactoryImpl implements DecoratorBuilderFactory {
 	 */
 	@Override
 	public FeatureConfigurationBuilder newConfigurationBuilder(String factoryPid, String name) {
-		// TODO Auto-generated method stub
-		return null;
+		return featureService.getBuilderFactory().newConfigurationBuilder(factoryPid, name);
 	}
 
 	/* 
@@ -76,8 +76,6 @@ class DecoratorBuilderFactoryImpl implements DecoratorBuilderFactory {
 	 */
 	@Override
 	public FeatureExtensionBuilder newExtensionBuilder(String name, Type type, Kind kind) {
-		// TODO Auto-generated method stub
-		return null;
+		return featureService.getBuilderFactory().newExtensionBuilder(name, type, kind);
 	}
-
 }

@@ -29,7 +29,7 @@ import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 import org.osgi.service.featurelauncher.repository.ArtifactRepositoryFactory;
 
 /**
- * Util for {@link ArtifactRepository} operations.
+ * Util for {@link org.osgi.service.featurelauncher.repository.ArtifactRepository} operations.
  * 
  * @author Michael H. Siemaszko (mhs@into.software)
  * @since Oct 11, 2024

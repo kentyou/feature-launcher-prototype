@@ -13,36 +13,73 @@
  */
 package com.kentyou.featurelauncher.impl.decorator;
 
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.net.URLClassLoader;
-import java.nio.file.Path;
-import java.util.List;
-import java.util.Optional;
-import java.util.ServiceLoader;
-import java.util.stream.Collectors;
-
-import org.osgi.framework.launch.FrameworkFactory;
 import org.osgi.service.feature.Feature;
-import org.osgi.service.feature.FeatureArtifact;
 import org.osgi.service.feature.FeatureExtension;
-import org.osgi.service.feature.ID;
 import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
 import org.osgi.service.featurelauncher.decorator.DecoratorBuilderFactory;
-import org.osgi.service.featurelauncher.repository.ArtifactRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.kentyou.featurelauncher.impl.repository.FileSystemArtifactRepository;
+import org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler;
 
 /**
- * Implementation of {@link com.kentyou.featurelauncher.impl.decorator.LaunchFrameworkFeatureExtensionHandler}
+ * Handler for {@link org.osgi.service.featurelauncher.FeatureLauncherConstants.FRAMEWORK_LAUNCHING_PROPERTIES} {@link org.osgi.service.feature.FeatureExtension}
  * 
  * @author Michael H. Siemaszko (mhs@into.software)
- * @since Sep 15, 2024
+ * @since Oct 19, 2024
  */
-public class LaunchFrameworkFeatureExtensionHandlerImpl implements LaunchFrameworkFeatureExtensionHandler {
-	private static final Logger LOG = LoggerFactory.getLogger(LaunchFrameworkFeatureExtensionHandlerImpl.class);
+public class FrameworkLaunchingPropertiesFeatureExtensionHandlerImpl implements FeatureExtensionHandler {
+
+	/*
+	 * 
+	 * 159.8 Framework Launching Properties
+	 * 
+	 * When a Feature is launched in an OSGi framework it may be necessary to
+	 * specify Framework Properties. These are provided in the Framework Launching
+	 * Properties extension section of the Feature. The Launcher must be able to
+	 * satisfy the specified properties. If it cannot ensure that these are present
+	 * in the running Framework the launcher must fail.
+	 * 
+	 * Framework Launching Properties can reference Variables as defined in
+	 * Variables on page 76.
+	 * 
+	 * These variables are substituted before the properties are set.
+	 * 
+	 * (...)
+	 * 
+	 */
+
+	/*
+	 * 160.4.2.1 Providing Framework Launch Properties
+	 * 
+	 * (...)
+	 * 
+	 * Feature definitions that require particular framework launch properties can
+	 * define them using a Feature Extension named FRAMEWORK_LAUNCHING_PROPERTIES.
+	 * The Type of this Feature Extension must be JSON, where the value is a single
+	 * JSON object. Each JSON property in this object represents a single Framework
+	 * Launch Property. The name of each JSON property must be used as the name of a
+	 * Framework Launch Property, unless the name starts with a single underscore _.
+	 * The value of each property is used as the value of the Framework Launch
+	 * Property, and must be a scalar type, that is a JSON string, number or
+	 * boolean. If the value is a different JSON type then this must be treated as
+	 * an error.
+	 * 
+	 * If the JSON property starts with a single underscore then it may be used for
+	 * implementation specific behaviour, with the prefix _osgi reserved for future
+	 * specifications. Implementation specific behaviours may permit JSON values to
+	 * be any value JSON type
+	 * 
+	 * If users require their Framework Launch Property name to start with an
+	 * underscore then they must use two underscores __ in the JSON property name.
+	 * When the implementation detects more than one underscore at the beginning of
+	 * a JSON property defined in this extension the leading underscore must be
+	 * removed, and the remaining string used as the Framework Launch Property name.
+	 * 
+	 * All implementations of the Feature Launcher must support this extension, and
+	 * use it to populate the Framework Launch Properties. The version of this
+	 * extension is 1.0.0, and may be declared in the extension JSON using the
+	 * property FRAMEWORK_LAUNCHING_PROPERTIES_VERSION.
+	 * 
+	 * (...)
+	 */
 
 	/* 
 	 * (non-Javadoc)
@@ -132,80 +169,5 @@ public class LaunchFrameworkFeatureExtensionHandlerImpl implements LaunchFramewo
 		 **/
 		// so, just return the original feature for now
 		return feature;
-	}
-
-	/* 
-	 * (non-Javadoc)
-	 * @see com.kentyou.featurelauncher.impl.decorator.LaunchFrameworkFeatureExtensionHandler#selectFrameworkFactory(org.osgi.service.feature.FeatureExtension, java.util.List, java.util.Optional)
-	 */
-	@Override
-	public Optional<FrameworkFactory> selectFrameworkFactory(FeatureExtension featureExtension,
-			List<ArtifactRepository> artifactRepositories, Optional<FrameworkFactory> defaultFrameworkFactoryOptional) {
-		Optional<FrameworkFactory> selectedFrameworkFactoryOptional = Optional.empty();
-
-		for (FeatureArtifact featureArtifact : featureExtension.getArtifacts()) {
-			Path artifactPath = getArtifactPath(featureArtifact.getID(), artifactRepositories);
-
-			URL artifactJarFileURL = constructArtifactJarFileURL(artifactPath);
-
-			try {
-
-				URLClassLoader urlClassLoader = URLClassLoader.newInstance(new URL[] { artifactJarFileURL },
-						Thread.currentThread().getContextClassLoader());
-
-				ServiceLoader<FrameworkFactory> serviceLoader = ServiceLoader.load(FrameworkFactory.class,
-						urlClassLoader);
-
-				// @formatter:off
-				List<FrameworkFactory> loadedServices = serviceLoader.stream()
-						.map(p -> p.get())
-						.collect(Collectors.toList());
-				// @formatter:on
-
-				if (defaultFrameworkFactoryOptional.isPresent() && loadedServices.size() > 1) {
-					// @formatter:off
-					loadedServices.stream()
-						.filter(ff -> (ff.getClass().isInstance(defaultFrameworkFactoryOptional.get())))
-						.findFirst()
-						.ifPresent(loadedServices::remove);
-					// @formatter:on
-				}
-
-				selectedFrameworkFactoryOptional = Optional.of(loadedServices.get(0));
-
-				if (selectedFrameworkFactoryOptional.isPresent()) {
-					LOG.info(String.format("Selected '%s' OSGi framework implementation",
-							selectedFrameworkFactoryOptional.get()));
-					Thread.currentThread().setContextClassLoader(urlClassLoader);
-					break;
-				} else {
-					urlClassLoader.close();
-				}
-			} catch (Throwable t) {
-				LOG.warn(String.format("'%s' is not an OSGi framework implementation!", featureArtifact.getID()), t);
-			}
-		}
-
-		return selectedFrameworkFactoryOptional;
-	}
-
-	private Path getArtifactPath(ID artifactId, List<ArtifactRepository> artifactRepositories) {
-		for (ArtifactRepository artifactRepository : artifactRepositories) {
-			Path artifactPath = ((FileSystemArtifactRepository) artifactRepository).getArtifactPath(artifactId);
-			if (artifactPath != null) {
-				return artifactPath;
-			}
-		}
-
-		return null;
-	}
-
-	private URL constructArtifactJarFileURL(Path jarFilePath) {
-		try {
-			return jarFilePath.toUri().toURL();
-		} catch (MalformedURLException e) {
-			LOG.error("Error constructing URL for JAR artifact!", e);
-			throw new RuntimeException(e);
-		}
 	}
 }

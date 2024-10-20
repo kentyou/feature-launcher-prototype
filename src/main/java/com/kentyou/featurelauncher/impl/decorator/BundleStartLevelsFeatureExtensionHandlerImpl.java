@@ -13,36 +13,48 @@
  */
 package com.kentyou.featurelauncher.impl.decorator;
 
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.net.URLClassLoader;
-import java.nio.file.Path;
-import java.util.List;
-import java.util.Optional;
-import java.util.ServiceLoader;
-import java.util.stream.Collectors;
-
-import org.osgi.framework.launch.FrameworkFactory;
 import org.osgi.service.feature.Feature;
-import org.osgi.service.feature.FeatureArtifact;
 import org.osgi.service.feature.FeatureExtension;
-import org.osgi.service.feature.ID;
 import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
 import org.osgi.service.featurelauncher.decorator.DecoratorBuilderFactory;
-import org.osgi.service.featurelauncher.repository.ArtifactRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.kentyou.featurelauncher.impl.repository.FileSystemArtifactRepository;
+import org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler;
 
 /**
- * Implementation of {@link com.kentyou.featurelauncher.impl.decorator.LaunchFrameworkFeatureExtensionHandler}
+ * Handler for {@link org.osgi.service.featurelauncher.FeatureLauncherConstants.BUNDLE_START_LEVELS} {@link org.osgi.service.feature.FeatureExtension}
  * 
  * @author Michael H. Siemaszko (mhs@into.software)
- * @since Sep 15, 2024
+ * @since Oct 19, 2024
  */
-public class LaunchFrameworkFeatureExtensionHandlerImpl implements LaunchFrameworkFeatureExtensionHandler {
-	private static final Logger LOG = LoggerFactory.getLogger(LaunchFrameworkFeatureExtensionHandlerImpl.class);
+public class BundleStartLevelsFeatureExtensionHandlerImpl implements FeatureExtensionHandler {
+
+	/*
+	 * 160.3.2 Setting the bundle start levels
+	 * 
+	 * An OSGi framework contains a number of bundles which collaborate to produce a
+	 * functioning application. There are times when some bundles require the system
+	 * to have reached a certain state before they can be started. To address this
+	 * use case the OSGi framework has the concept of start levels as described in
+	 * the Start Level API Specification chapter of OSGi Core Release 8.
+	 * 
+	 * Setting the initial start level for the OSGi framework when bootstrapping can
+	 * easily be achieved using the framework launch property
+	 * org.osgi.framework.startlevel.beginning as defined by the OSGi core
+	 * specification.
+	 * 
+	 * Controlling the start levels assigned to the bundles in a feature is managed
+	 * through the use of Feature Bundle metadata. Specifically the Feature Launcher
+	 * will look for a Feature Bundle metadata property named
+	 * BUNDLE_START_LEVEL_METADATA which is of type integer and has a value between
+	 * 1 and Integer.MAX_VALUE inclusive. If the property does not exist then the
+	 * default start level will be used. If the property does exist and is not a
+	 * suitable integer then launching must fail with a LaunchException.
+	 * 
+	 * Setting the default start level for the bundles, and the minimum start level
+	 * required for an installed Feature is accomplished by using a Feature
+	 * Extension named BUNDLE_START_LEVELS with Type JSON. The JSON contained in
+	 * this extension is used to configure the default start level for the bundles,
+	 * and the target start level for the framework. (...)
+	 */
 
 	/* 
 	 * (non-Javadoc)
@@ -132,80 +144,5 @@ public class LaunchFrameworkFeatureExtensionHandlerImpl implements LaunchFramewo
 		 **/
 		// so, just return the original feature for now
 		return feature;
-	}
-
-	/* 
-	 * (non-Javadoc)
-	 * @see com.kentyou.featurelauncher.impl.decorator.LaunchFrameworkFeatureExtensionHandler#selectFrameworkFactory(org.osgi.service.feature.FeatureExtension, java.util.List, java.util.Optional)
-	 */
-	@Override
-	public Optional<FrameworkFactory> selectFrameworkFactory(FeatureExtension featureExtension,
-			List<ArtifactRepository> artifactRepositories, Optional<FrameworkFactory> defaultFrameworkFactoryOptional) {
-		Optional<FrameworkFactory> selectedFrameworkFactoryOptional = Optional.empty();
-
-		for (FeatureArtifact featureArtifact : featureExtension.getArtifacts()) {
-			Path artifactPath = getArtifactPath(featureArtifact.getID(), artifactRepositories);
-
-			URL artifactJarFileURL = constructArtifactJarFileURL(artifactPath);
-
-			try {
-
-				URLClassLoader urlClassLoader = URLClassLoader.newInstance(new URL[] { artifactJarFileURL },
-						Thread.currentThread().getContextClassLoader());
-
-				ServiceLoader<FrameworkFactory> serviceLoader = ServiceLoader.load(FrameworkFactory.class,
-						urlClassLoader);
-
-				// @formatter:off
-				List<FrameworkFactory> loadedServices = serviceLoader.stream()
-						.map(p -> p.get())
-						.collect(Collectors.toList());
-				// @formatter:on
-
-				if (defaultFrameworkFactoryOptional.isPresent() && loadedServices.size() > 1) {
-					// @formatter:off
-					loadedServices.stream()
-						.filter(ff -> (ff.getClass().isInstance(defaultFrameworkFactoryOptional.get())))
-						.findFirst()
-						.ifPresent(loadedServices::remove);
-					// @formatter:on
-				}
-
-				selectedFrameworkFactoryOptional = Optional.of(loadedServices.get(0));
-
-				if (selectedFrameworkFactoryOptional.isPresent()) {
-					LOG.info(String.format("Selected '%s' OSGi framework implementation",
-							selectedFrameworkFactoryOptional.get()));
-					Thread.currentThread().setContextClassLoader(urlClassLoader);
-					break;
-				} else {
-					urlClassLoader.close();
-				}
-			} catch (Throwable t) {
-				LOG.warn(String.format("'%s' is not an OSGi framework implementation!", featureArtifact.getID()), t);
-			}
-		}
-
-		return selectedFrameworkFactoryOptional;
-	}
-
-	private Path getArtifactPath(ID artifactId, List<ArtifactRepository> artifactRepositories) {
-		for (ArtifactRepository artifactRepository : artifactRepositories) {
-			Path artifactPath = ((FileSystemArtifactRepository) artifactRepository).getArtifactPath(artifactId);
-			if (artifactPath != null) {
-				return artifactPath;
-			}
-		}
-
-		return null;
-	}
-
-	private URL constructArtifactJarFileURL(Path jarFilePath) {
-		try {
-			return jarFilePath.toUri().toURL();
-		} catch (MalformedURLException e) {
-			LOG.error("Error constructing URL for JAR artifact!", e);
-			throw new RuntimeException(e);
-		}
 	}
 }
