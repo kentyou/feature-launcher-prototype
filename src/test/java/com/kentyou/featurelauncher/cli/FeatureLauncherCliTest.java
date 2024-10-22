@@ -30,7 +30,6 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -98,7 +97,7 @@ public class FeatureLauncherCliTest {
 		System.setOut(originalOut);
 		System.setErr(originalErr);
 	}
-
+	
 	@Test
 	public void testFeatureFileParameter() throws IOException {
 		List<String> args = List.of("--impl-dry-run", "--impl-default-repos", Files.readString(FEATURE_FILE_PATH));
@@ -202,7 +201,11 @@ public class FeatureLauncherCliTest {
 
 		assertTrue(out.toString().contains(String.format("Launching feature %s", FEATURE_FILE_ID)));
 		assertTrue(out.toString().contains("Using artifact repositories:"));
-		assertTrue(out.toString().contains(String.format("repositoryURI=%s", LOCAL_ARTIFACT_REPOSITORY_URI)));
+		String path = LOCAL_ARTIFACT_REPOSITORY_URI.getPath();
+		if(path.endsWith("/")) {
+			path = path.substring(0, path.length() - 1);
+		}
+		assertTrue(out.toString().contains(String.format("localRepositoryPath=%s", path)));
 		assertTrue(out.toString().contains(String.format("name=%s", DEFAULT_LOCAL_ARTIFACT_REPOSITORY_NAME)));
 		assertTrue(out.toString().contains(String.format("repositoryURI=%s", REMOTE_ARTIFACT_REPOSITORY_URI)));
 		assertTrue(out.toString().contains(String.format("name=%s", DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME)));
@@ -225,7 +228,11 @@ public class FeatureLauncherCliTest {
 
 		assertTrue(out.toString().contains(String.format("Launching feature %s", FEATURE_FILE_ID)));
 		assertTrue(out.toString().contains("Using artifact repositories:"));
-		assertTrue(out.toString().contains(String.format("repositoryURI=%s", LOCAL_ARTIFACT_REPOSITORY_URI)));
+		String path = LOCAL_ARTIFACT_REPOSITORY_URI.getPath();
+		if(path.endsWith("/")) {
+			path = path.substring(0, path.length() - 1);
+		}
+		assertTrue(out.toString().contains(String.format("localRepositoryPath=%s", path)));
 		assertTrue(out.toString().contains(String.format("name=%s", DEFAULT_LOCAL_ARTIFACT_REPOSITORY_NAME)));
 		assertTrue(out.toString().contains(String.format("repositoryURI=%s", REMOTE_ARTIFACT_REPOSITORY_URI)));
 		assertTrue(out.toString().contains(String.format("name=%s", DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME)));

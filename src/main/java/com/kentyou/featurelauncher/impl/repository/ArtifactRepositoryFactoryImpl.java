@@ -14,7 +14,6 @@
 package com.kentyou.featurelauncher.impl.repository;
 
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.LOCAL_ARTIFACT_REPOSITORY_PATH;
-import static org.osgi.service.featurelauncher.repository.ArtifactRepositoryConstants.ARTIFACT_REPOSITORY_NAME;
 
 import java.net.URI;
 import java.nio.file.Path;
@@ -60,15 +59,19 @@ public class ArtifactRepositoryFactoryImpl implements ArtifactRepositoryFactory 
 		Objects.requireNonNull(uri, "URI cannot be null!");
 		Objects.requireNonNull(configurationProperties, "Configuration properties cannot be null!");
 
-		if (configurationProperties.isEmpty()) {
-			throw new NullPointerException("Configuration properties cannot be empty!");
-		} else if (!configurationProperties.containsKey(ARTIFACT_REPOSITORY_NAME)) {
-			throw new NullPointerException("Remote repository name is required!");
-		} else if (configurationProperties.containsKey(LOCAL_ARTIFACT_REPOSITORY_PATH)) {
+		if(isLocalArtifactRepository(uri)) {
+			return new LocalArtifactRepositoryImpl(Paths.get(uri), configurationProperties);
+		}
+		
+		if (configurationProperties.containsKey(LOCAL_ARTIFACT_REPOSITORY_PATH)) {
 			FileSystemUtil.validateDirectory(
 					Paths.get(String.valueOf(configurationProperties.get(LOCAL_ARTIFACT_REPOSITORY_PATH))));
 		}
 
 		return new RemoteArtifactRepositoryImpl(uri, configurationProperties);
+	}
+	
+	public static boolean isLocalArtifactRepository(URI uri) {
+		return "file".equals(uri.getScheme());
 	}
 }

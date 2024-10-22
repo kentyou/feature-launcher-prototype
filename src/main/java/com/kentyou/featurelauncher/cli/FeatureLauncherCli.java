@@ -14,8 +14,8 @@
 package com.kentyou.featurelauncher.cli;
 
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.DEFAULT_LOCAL_ARTIFACT_REPOSITORY_NAME;
-import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME;
 import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryConstants.LOCAL_ARTIFACT_REPOSITORY_PATH;
+import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryFactoryImpl.isLocalArtifactRepository;
 import static org.osgi.service.featurelauncher.repository.ArtifactRepositoryConstants.ARTIFACT_REPOSITORY_NAME;
 
 import java.io.IOException;
@@ -31,6 +31,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
@@ -45,6 +46,7 @@ import org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler;
 import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 import org.osgi.service.featurelauncher.repository.ArtifactRepositoryFactory;
 
+import com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryFactoryImpl;
 import com.kentyou.featurelauncher.impl.util.ArtifactRepositoryUtil;
 import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
 
@@ -318,13 +320,23 @@ public class FeatureLauncherCli implements Runnable {
 
 		if (!userSpecifiedRemoteArtifactRepositories.isEmpty()) {
 
-			for (Map.Entry<URI, Map<String, Object>> userSpecifiedRemoteArtifactRepositoryEntry : userSpecifiedRemoteArtifactRepositories
+			uris: for (Map.Entry<URI, Map<String, Object>> userSpecifiedRemoteArtifactRepositoryEntry : userSpecifiedRemoteArtifactRepositories
 					.entrySet()) {
 
 				Map<String, Object> configurationProperties = userSpecifiedRemoteArtifactRepositoryEntry.getValue();
 				if (isLocalArtifactRepository(userSpecifiedRemoteArtifactRepositoryEntry.getKey())) {
-					configurationProperties.putIfAbsent(ARTIFACT_REPOSITORY_NAME,
-							DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME);
+					
+					ArtifactRepository local = artifactRepositoryFactory.createRepository(
+							Path.of(userSpecifiedRemoteArtifactRepositoryEntry.getKey()));
+					String baseName = (String) configurationProperties.getOrDefault(ARTIFACT_REPOSITORY_NAME, DEFAULT_LOCAL_ARTIFACT_REPOSITORY_NAME);
+					String name = baseName;
+					for(int i = 1; ; i++) {
+						if(!artifactRepositories.containsKey(name)) {
+							artifactRepositories.put(name, local);
+							continue uris;
+						}
+						name = baseName + "_" + i;
+					}
 				}
 				configurationProperties.putIfAbsent(LOCAL_ARTIFACT_REPOSITORY_PATH, defaultM2RepositoryPath.toString());
 
@@ -337,10 +349,6 @@ public class FeatureLauncherCli implements Runnable {
 		}
 
 		return artifactRepositories;
-	}
-
-	private boolean isLocalArtifactRepository(URI uri) {
-		return "file".equals(uri.getScheme());
 	}
 
 	private Map<String, String> getDefaultFrameworkProperties(Path defaultFrameworkStorageDir) {
@@ -394,35 +402,28 @@ public class FeatureLauncherCli implements Runnable {
 
 		@Override
 		public void consumeParameters(Stack<String> args, ArgSpec argSpec, CommandSpec commandSpec) {
-			String raw = args.pop();
-			if (raw.contains(",")) {
-				List<String> rawArtifactRepositoryDefinition = new ArrayList<>(Arrays.asList(raw.split(",")));
-
-				URI artifactRepositoryURI = URI.create(rawArtifactRepositoryDefinition.remove(0));
-
-				for (String rawArtifactRepositoryConfigurationPropertyEntry : rawArtifactRepositoryDefinition) {
-					if (rawArtifactRepositoryConfigurationPropertyEntry.contains("=")) {
-
-						Map<URI, Map<String, Object>> fieldValue = new HashMap<>();
-						Map<String, Object> artifactRepositoryConfigurationProperties = new HashMap<>();
-						if (argSpec.getValue() == null) {
-							argSpec.setValue(fieldValue);
-						} else {
-							fieldValue = argSpec.getValue();
-							if (fieldValue.containsKey(artifactRepositoryURI)) {
-								artifactRepositoryConfigurationProperties = fieldValue.get(artifactRepositoryURI);
-							}
-						}
-
-						String[] artifactRepositoryConfigurationPropertyEntry = rawArtifactRepositoryConfigurationPropertyEntry
-								.split("=");
-						artifactRepositoryConfigurationProperties.put(artifactRepositoryConfigurationPropertyEntry[0],
-								artifactRepositoryConfigurationPropertyEntry[1]);
-
-						fieldValue.put(artifactRepositoryURI, artifactRepositoryConfigurationProperties);
-					}
-				}
+			Map<URI, Map<String, Object>> repos = null;
+			
+			if(argSpec.isValueGettable()) {
+				repos = argSpec.getValue();
 			}
+			if(repos == null) {
+				repos = new LinkedHashMap<>();
+				argSpec.setValue(repos);
+			}
+			
+			String raw = args.pop();
+			
+			List<String> rawArtifactRepositoryDefinition = new ArrayList<>(Arrays.asList(raw.split(",")));
+
+			URI artifactRepositoryURI = URI.create(rawArtifactRepositoryDefinition.remove(0));
+			
+			Map<String, Object> artifactRepositoryConfigurationProperties = repos.computeIfAbsent(artifactRepositoryURI, x -> new HashMap<>());
+
+			rawArtifactRepositoryDefinition.stream()
+				.filter(s -> s.contains("="))
+				.map(s -> s.split("=", 2))
+				.forEach(s -> artifactRepositoryConfigurationProperties.put(s[0], s[1]));
 		}
 	}
 

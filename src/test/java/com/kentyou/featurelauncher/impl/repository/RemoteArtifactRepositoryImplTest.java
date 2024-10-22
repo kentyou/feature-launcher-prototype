@@ -109,15 +109,19 @@ public class RemoteArtifactRepositoryImplTest {
 
 	@Test
 	public void testCreateRemoteArtifactRepositoryEmptyConfigurationProperties() {
-		assertThrows(NullPointerException.class, () -> artifactRepositoryFactory
-				.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI, Collections.emptyMap()));
+		ArtifactRepository remoteRepository = artifactRepositoryFactory.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
+				Map.of());
+
+		assertNotNull(remoteRepository);
+		assertTrue(remoteRepository instanceof RemoteArtifactRepositoryImpl);
 	}
 
 	@Test
 	public void testCreateRemoteArtifactRepositoryNoRepositoryName() {
-		assertThrows(NullPointerException.class,
-				() -> artifactRepositoryFactory.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
-						Map.of(LOCAL_ARTIFACT_REPOSITORY_PATH, localM2RepositoryPath.toString())));
+		ArtifactRepository remoteRepository = artifactRepositoryFactory.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
+						Map.of(LOCAL_ARTIFACT_REPOSITORY_PATH, localM2RepositoryPath.toString()));
+		assertNotNull(remoteRepository);
+		assertTrue(remoteRepository instanceof RemoteArtifactRepositoryImpl);
 	}
 
 	@Test
