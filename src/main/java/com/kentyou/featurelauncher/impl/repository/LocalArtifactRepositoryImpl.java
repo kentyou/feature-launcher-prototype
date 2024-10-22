@@ -13,6 +13,8 @@
  */
 package com.kentyou.featurelauncher.impl.repository;
 
+import static org.osgi.service.featurelauncher.repository.ArtifactRepositoryConstants.ARTIFACT_REPOSITORY_NAME;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -20,9 +22,11 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 import org.osgi.service.feature.ID;
 import org.slf4j.Logger;
@@ -60,9 +64,18 @@ class LocalArtifactRepositoryImpl implements FileSystemArtifactRepository {
 	// @formatter:on
 
 	private final Path localRepositoryPath;
+	
+	private final Map<String, Object> configurationProperties;
 
 	LocalArtifactRepositoryImpl(Path localRepositoryPath) {
+		this(localRepositoryPath, Map.of());
+	}
+	
+	LocalArtifactRepositoryImpl(Path localRepositoryPath, Map<String, Object> configurationProperties) {
 		this.localRepositoryPath = localRepositoryPath;
+		this.configurationProperties = new HashMap<>(configurationProperties);
+		this.configurationProperties.computeIfAbsent(ARTIFACT_REPOSITORY_NAME,
+				k -> String.format("local-%s", UUID.randomUUID()));
 	}
 
 	/* 
@@ -154,6 +167,7 @@ class LocalArtifactRepositoryImpl implements FileSystemArtifactRepository {
 	 */
 	@Override
 	public String toString() {
-		return "LocalArtifactRepositoryImpl [localRepositoryPath=" + localRepositoryPath + "]";
+		return "LocalArtifactRepositoryImpl [localRepositoryPath=" + localRepositoryPath + 
+				", configurationProperties=" + configurationProperties + "]";
 	}
 }

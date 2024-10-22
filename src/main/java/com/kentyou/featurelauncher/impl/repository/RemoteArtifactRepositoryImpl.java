@@ -26,8 +26,10 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
 import org.apache.maven.internal.impl.resolver.MavenSessionBuilderSupplier;
 import org.eclipse.aether.DefaultRepositorySystemSession;
@@ -65,15 +67,16 @@ class RemoteArtifactRepositoryImpl implements FileSystemArtifactRepository {
 
 	public RemoteArtifactRepositoryImpl(URI repositoryURI, Map<String, Object> configurationProperties) {
 		this.repositoryURI = repositoryURI;
-		this.configurationProperties = configurationProperties;
+		this.configurationProperties = new HashMap<>(configurationProperties);
+		
+		this.configurationProperties.computeIfAbsent(ARTIFACT_REPOSITORY_NAME,
+				k -> String.format("remote-%s", UUID.randomUUID()));
+		
+		this.configurationProperties.computeIfAbsent(LOCAL_ARTIFACT_REPOSITORY_PATH,
+				k -> createTemporaryLocalArtifactRepository());
 
-		if (!configurationProperties.isEmpty() && configurationProperties.containsKey(LOCAL_ARTIFACT_REPOSITORY_PATH)) {
-			this.localRepositoryPath = Paths
-					.get(String.valueOf(configurationProperties.get(LOCAL_ARTIFACT_REPOSITORY_PATH)));
-		} else {
-			this.localRepositoryPath = createTemporaryLocalArtifactRepository();
-		}
-
+		this.localRepositoryPath = Paths
+				.get(String.valueOf(this.configurationProperties.get(LOCAL_ARTIFACT_REPOSITORY_PATH)));
 		// @formatter:off
 		this.remoteRepository = new RemoteRepository.Builder(
 				String.valueOf(this.configurationProperties.get(ARTIFACT_REPOSITORY_NAME)), 
