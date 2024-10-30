@@ -13,6 +13,9 @@
  */
 package com.kentyou.featurelauncher.impl;
 
+import static org.osgi.service.featurelauncher.FeatureLauncherConstants.BUNDLE_START_LEVELS;
+import static org.osgi.service.featurelauncher.FeatureLauncherConstants.FRAMEWORK_LAUNCHING_PROPERTIES;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
@@ -33,22 +36,25 @@ import org.osgi.framework.Constants;
 import org.osgi.framework.FrameworkEvent;
 import org.osgi.framework.launch.Framework;
 import org.osgi.framework.launch.FrameworkFactory;
+import org.osgi.framework.startlevel.FrameworkStartLevel;
 import org.osgi.service.feature.Feature;
 import org.osgi.service.feature.FeatureBundle;
 import org.osgi.service.feature.FeatureService;
 import org.osgi.service.feature.ID;
 import org.osgi.service.featurelauncher.FeatureLauncher;
 import org.osgi.service.featurelauncher.LaunchException;
+import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
 import org.osgi.service.featurelauncher.decorator.FeatureDecorator;
 import org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler;
 import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.kentyou.featurelauncher.impl.decorator.BundleStartLevelsFeatureExtensionHandler;
+import com.kentyou.featurelauncher.impl.decorator.FrameworkLaunchingPropertiesFeatureExtensionHandler;
 import com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryFactoryImpl;
 import com.kentyou.featurelauncher.impl.util.BundleEventUtil;
-import com.kentyou.featurelauncher.impl.util.FeatureDecoratorUtil;
-import com.kentyou.featurelauncher.impl.util.FeatureExtensionUtil;
+import com.kentyou.featurelauncher.impl.util.FeatureDecorationUtil;
 import com.kentyou.featurelauncher.impl.util.FileSystemUtil;
 import com.kentyou.featurelauncher.impl.util.FrameworkEventUtil;
 import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
@@ -61,7 +67,7 @@ import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
  */
 public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implements FeatureLauncher {
 	private static final Logger LOG = LoggerFactory.getLogger(FeatureLauncherImpl.class);
-	
+
 	/* 
 	 * (non-Javadoc)
 	 * @see org.osgi.service.featurelauncher.FeatureLauncher#launch(org.osgi.service.feature.Feature)
@@ -89,13 +95,11 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			return launch(feature);
 
 		} catch (IOException e) {
-			LOG.error("Error reading feature!", e);
 			throw new LaunchException("Error reading feature!", e);
 		}
 	}
 
 	class LaunchBuilderImpl implements LaunchBuilder {
-		private final Feature originalFeature;
 		private Feature feature;
 		private boolean isLaunched;
 		private List<Bundle> installedBundles;
@@ -110,7 +114,6 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 		LaunchBuilderImpl(Feature feature) {
 			Objects.requireNonNull(feature, "Feature cannot be null!");
 
-			this.originalFeature = feature;
 			this.feature = feature;
 			this.isLaunched = false;
 			this.installedBundles = new ArrayList<>();
@@ -222,7 +225,6 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			Objects.requireNonNull(feature, "Feature is required!");
 
 			if (this.artifactRepositories.isEmpty()) {
-				LOG.error("At least one Artifact Repository is required!");
 				throw new NullPointerException("At least one Artifact Repository is required!");
 			}
 
@@ -232,9 +234,13 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 
 			//////////////////////////////////////
 			// 160.4.3.1: Feature Decoration
-			feature = FeatureDecoratorUtil.executeFeatureDecorators(feature, decorators);
+			try {
+				feature = FeatureDecorationUtil.executeFeatureDecorators(feature, decorators);
 
-			feature = FeatureExtensionUtil.executeFeatureExtensionHandlers(feature, extensionHandlers);
+				feature = FeatureDecorationUtil.executeFeatureExtensionHandlers(feature, extensionHandlers);
+			} catch (AbandonOperationException e) {
+				throw new LaunchException("Feature decoration handling failed!", e);
+			}
 
 			/////////////////////////////////////////////////
 			// 160.4.3.2: Locating a framework implementation
@@ -243,7 +249,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 
 			///////////////////////////////////////////
 			// 160.4.3.3: Creating a Framework instance
-			Framework framework = createFramework(frameworkFactory, frameworkProps);
+			Framework framework = createFramework(frameworkFactory, getFrameworkProperties());
 
 			/////////////////////////////////////////////////////////
 			// 160.4.3.4: Installing bundles and configurations
@@ -265,24 +271,80 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			return framework;
 		}
 
+		private Map<String, String> getFrameworkProperties() {
+			Map<String, String> frameworkProperties = new HashMap<>(frameworkProps);
+
+			if (FeatureDecorationUtil.hasFrameworkLaunchingPropertiesFeatureExtension(feature.getExtensions())) {
+				try {
+					FrameworkLaunchingPropertiesFeatureExtensionHandler frameworkLaunchingPropertiesFeatureExtensionHandler = FeatureDecorationUtil
+							.getBuiltInHandlerForExtension(FRAMEWORK_LAUNCHING_PROPERTIES);
+
+					frameworkProperties
+							.putAll(frameworkLaunchingPropertiesFeatureExtensionHandler.getFrameworkProperties());
+
+				} catch (AbandonOperationException e) {
+					throw new LaunchException(e.getMessage(), e);
+				}
+			}
+
+			return frameworkProperties;
+		}
+
 		private Framework createFramework(FrameworkFactory frameworkFactory, Map<String, String> frameworkProperties) {
 			Framework framework = frameworkFactory.newFramework(frameworkProperties);
 			try {
 				framework.init();
 
+				maybeSetInitialBundleStartLevel(framework);
+
 				addLogListeners(framework);
 
 			} catch (BundleException e) {
-				LOG.error("Could not initialize framework!", e);
 				throw new LaunchException("Could not initialize framework!", e);
 			}
 			return framework;
+		}
+
+		private void maybeSetFrameworkStartLevel(Framework framework) {
+			if (FeatureDecorationUtil.hasBundleStartLevelsFeatureExtension(feature.getExtensions())) {
+				try {
+					BundleStartLevelsFeatureExtensionHandler bundleStartLevelsFeatureExtensionHandler = FeatureDecorationUtil
+							.getBuiltInHandlerForExtension(BUNDLE_START_LEVELS);
+
+					if (bundleStartLevelsFeatureExtensionHandler.hasMinimumFrameworkStartLevel()) {
+						framework.adapt(FrameworkStartLevel.class).setStartLevel(
+								bundleStartLevelsFeatureExtensionHandler.getMinimumFrameworkStartLevel().intValue());
+					}
+
+				} catch (AbandonOperationException e) {
+					throw new LaunchException(e.getMessage(), e);
+				}
+			}
+		}
+
+		private void maybeSetInitialBundleStartLevel(Framework framework) {
+			if (FeatureDecorationUtil.hasBundleStartLevelsFeatureExtension(feature.getExtensions())) {
+				try {
+					BundleStartLevelsFeatureExtensionHandler bundleStartLevelsFeatureExtensionHandler = FeatureDecorationUtil
+							.getBuiltInHandlerForExtension(BUNDLE_START_LEVELS);
+
+					if (bundleStartLevelsFeatureExtensionHandler.hasDefaultBundleStartLevel()) {
+						framework.adapt(FrameworkStartLevel.class).setInitialBundleStartLevel(
+								bundleStartLevelsFeatureExtensionHandler.getDefaultBundleStartLevel().intValue());
+					}
+
+				} catch (AbandonOperationException e) {
+					throw new LaunchException(e.getMessage(), e);
+				}
+			}
 		}
 
 		private void startFramework(Framework framework) {
 			LOG.info("Starting framework..");
 			try {
 				framework.start();
+
+				maybeSetFrameworkStartLevel(framework);
 
 				// TODO: once start levels are involved, bundles can be started transiently,
 				// before call to framework.start()
@@ -293,7 +355,6 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 				// 160.4.3.6: Cleanup after failure
 				cleanup(framework);
 
-				LOG.error("Could not start framework!", e);
 				throw new LaunchException("Could not start framework!", e);
 			}
 		}
@@ -353,7 +414,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 				}
 
 			} else {
-				LOG.error("There are no bundles to install!");
+				LOG.warn("There are no bundles to install!");
 			}
 		}
 
@@ -369,7 +430,6 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 					LOG.info(String.format("Installed bundle '%s'", installedBundle.getSymbolicName()));
 				}
 			} catch (IOException | BundleException e) {
-				LOG.error(String.format("Could not install bundle '%s'!", featureBundleID.toString()), e);
 				throw new LaunchException(String.format("Could not install bundle '%s'!", featureBundleID.toString()),
 						e);
 			}
@@ -449,7 +509,6 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 
 		private void ensureNotLaunchedYet() {
 			if (this.isLaunched == true) {
-				LOG.error("Framework already launched!");
 				throw new IllegalStateException("Framework already launched!");
 			}
 		}

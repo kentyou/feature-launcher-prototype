@@ -24,15 +24,15 @@ import java.net.URI;
  * @since Sep 25, 2024
  */
 public interface ArtifactRepositoryConstants {
-	static final String REMOTE_ARTIFACT_REPOSITORY_TYPE = "type";
+	String REMOTE_ARTIFACT_REPOSITORY_TYPE = "type";
 
-	static final String DEFAULT_REMOTE_ARTIFACT_REPOSITORY_TYPE = "default";
+	String DEFAULT_REMOTE_ARTIFACT_REPOSITORY_TYPE = "default";
 
-	static final URI REMOTE_ARTIFACT_REPOSITORY_URI = URI.create("https://repo1.maven.org/maven2/");
+	URI REMOTE_ARTIFACT_REPOSITORY_URI = URI.create("https://repo1.maven.org/maven2/");
 
-	static final String LOCAL_ARTIFACT_REPOSITORY_PATH = "localRepositoryPath";
+	String LOCAL_ARTIFACT_REPOSITORY_PATH = "localRepositoryPath";
 
-	static final String DEFAULT_LOCAL_ARTIFACT_REPOSITORY_NAME = "local";
+	String DEFAULT_LOCAL_ARTIFACT_REPOSITORY_NAME = "local";
 
-	static final String DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME = "central";
+	String DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME = "central";
 }

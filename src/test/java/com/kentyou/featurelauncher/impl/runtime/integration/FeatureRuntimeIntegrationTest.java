@@ -46,6 +46,7 @@ import org.osgi.service.feature.FeatureService;
 import org.osgi.service.feature.ID;
 import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 import org.osgi.service.featurelauncher.runtime.FeatureRuntime;
+import org.osgi.service.featurelauncher.runtime.FeatureRuntimeConstants;
 import org.osgi.service.featurelauncher.runtime.InstalledBundle;
 import org.osgi.service.featurelauncher.runtime.InstalledConfiguration;
 import org.osgi.service.featurelauncher.runtime.InstalledFeature;
@@ -178,7 +179,7 @@ public class FeatureRuntimeIntegrationTest {
 	}
 
 	@ParameterizedTest
-	@ValueSource(booleans = {true, false})
+	@ValueSource(booleans = { true, false })
 	public void testInstallFeatureWithNoConfigWithCustomRepositories(boolean useDefault,
 			@InjectService(cardinality = 1, timeout = 5000) ServiceAware<FeatureRuntime> featureRuntimeServiceAware)
 			throws URISyntaxException, IOException {
@@ -246,7 +247,8 @@ public class FeatureRuntimeIntegrationTest {
 	@Test
 	public void testInstallFeatureWithConfigWithDefaultRepositories(
 			@InjectService(cardinality = 1, timeout = 5000) ServiceAware<FeatureRuntime> featureRuntimeServiceAware,
-			@InjectService(cardinality = 1, timeout = 5000) ServiceAware<FeatureRuntimeConfigurationManager> featureRuntimeConfigurationManagerServiceAware)
+			@InjectService(cardinality = 1, timeout = 5000) ServiceAware<FeatureRuntimeConfigurationManager> featureRuntimeConfigurationManagerServiceAware,
+			@InjectService(cardinality = 1, timeout = 5000) ServiceAware<FeatureService> featureServiceAware)
 			throws URISyntaxException, IOException {
 
 		assertEquals(1, featureRuntimeServiceAware.getServices().size());
@@ -258,8 +260,15 @@ public class FeatureRuntimeIntegrationTest {
 				.getService();
 		assertNotNull(featureRuntimeConfigurationManagerService);
 
+		assertEquals(1, featureServiceAware.getServices().size());
+		FeatureService featureService = featureServiceAware.getService();
+		assertNotNull(featureService);
+
+		ID externalFeatureId = featureService.getIDfromMavenCoordinates(FeatureRuntimeConstants.EXTERNAL_FEATURE_ID);
+		assertNotNull(externalFeatureId);
+
 		try (InputStream featureIs = getClass().getClassLoader()
-				.getResourceAsStream("/features/console-webconsole-feature.json");
+				.getResourceAsStream("/features/console-webconsole-feature.integration-tests.json");
 				Reader featureReader = new BufferedReader(
 						new InputStreamReader(featureIs, Charset.forName("UTF-8").newDecoder()));) {
 
@@ -279,7 +288,15 @@ public class FeatureRuntimeIntegrationTest {
 
 			assertNotNull(installedFeature.getInstalledBundles());
 			List<InstalledBundle> installedBundles = installedFeature.getInstalledBundles();
-			assertEquals(14, installedBundles.size());
+			assertEquals(13, installedBundles.size());
+			// FIXME: temporary workaround for Felix OSGi framework bug - apparently it does
+			// not allow installing fragment bundles with same symbolic name as those
+			// already installed in running framework; Equinox does not have such problem;
+//			assertEquals(14, installedBundles.size());
+
+			assertEquals("org.apache.felix.configadmin", installedBundles.get(0).getBundle().getSymbolicName());
+			assertTrue(installedBundles.get(0).getOwningFeatures().contains(installedFeature.getFeature().getID()));
+			assertTrue(installedBundles.get(0).getOwningFeatures().contains(externalFeatureId));
 
 			assertEquals("org.apache.felix.gogo.command", installedBundles.get(1).getBundle().getSymbolicName());
 			assertTrue(installedBundles.get(1).getOwningFeatures().contains(installedFeature.getFeature().getID()));
@@ -293,8 +310,14 @@ public class FeatureRuntimeIntegrationTest {
 			assertEquals("biz.aQute.gogo.commands.provider", installedBundles.get(4).getBundle().getSymbolicName());
 			assertTrue(installedBundles.get(4).getOwningFeatures().contains(installedFeature.getFeature().getID()));
 
-			assertEquals("org.apache.felix.webconsole", installedBundles.get(13).getBundle().getSymbolicName());
-			assertTrue(installedBundles.get(13).getOwningFeatures().contains(installedFeature.getFeature().getID()));
+			// FIXME: temporary workaround for Felix OSGi framework bug - apparently it does
+			// not allow installing fragment bundles with same symbolic name as those
+			// already installed in running framework; Equinox does not have such problem;
+//			assertEquals("org.apache.felix.webconsole", installedBundles.get(13).getBundle().getSymbolicName());
+//			assertTrue(installedBundles.get(13).getOwningFeatures().contains(installedFeature.getFeature().getID()));
+
+			assertEquals("org.apache.felix.webconsole", installedBundles.get(12).getBundle().getSymbolicName());
+			assertTrue(installedBundles.get(12).getOwningFeatures().contains(installedFeature.getFeature().getID()));
 
 			List<InstalledConfiguration> installedConfigurations = installedFeature.getInstalledConfigurations();
 			assertFalse(installedConfigurations.isEmpty());
@@ -335,7 +358,8 @@ public class FeatureRuntimeIntegrationTest {
 	@Test
 	public void testUpdateFeatureWithConfigWithDefaultRepositories(
 			@InjectService(cardinality = 1, timeout = 5000) ServiceAware<FeatureRuntime> featureRuntimeServiceAware,
-			@InjectService(cardinality = 1, timeout = 5000) ServiceAware<FeatureRuntimeConfigurationManager> featureRuntimeConfigurationManagerServiceAware)
+			@InjectService(cardinality = 1, timeout = 5000) ServiceAware<FeatureRuntimeConfigurationManager> featureRuntimeConfigurationManagerServiceAware,
+			@InjectService(cardinality = 1, timeout = 5000) ServiceAware<FeatureService> featureServiceAware)
 			throws URISyntaxException, IOException {
 
 		assertEquals(1, featureRuntimeServiceAware.getServices().size());
@@ -346,6 +370,13 @@ public class FeatureRuntimeIntegrationTest {
 		FeatureRuntimeConfigurationManager featureRuntimeConfigurationManagerService = featureRuntimeConfigurationManagerServiceAware
 				.getService();
 		assertNotNull(featureRuntimeConfigurationManagerService);
+
+		assertEquals(1, featureServiceAware.getServices().size());
+		FeatureService featureService = featureServiceAware.getService();
+		assertNotNull(featureService);
+
+		ID externalFeatureId = featureService.getIDfromMavenCoordinates(FeatureRuntimeConstants.EXTERNAL_FEATURE_ID);
+		assertNotNull(externalFeatureId);
 
 		// Install Feature using default repositories
 		try (InputStream featureIs = getClass().getClassLoader()
@@ -408,7 +439,15 @@ public class FeatureRuntimeIntegrationTest {
 
 			assertNotNull(updatedFeature.getInstalledBundles());
 			List<InstalledBundle> installedBundles = updatedFeature.getInstalledBundles();
-			assertEquals(14, installedBundles.size());
+			assertEquals(13, installedBundles.size());
+			// FIXME: temporary workaround for Felix OSGi framework bug - apparently it does
+			// not allow installing fragment bundles with same symbolic name as those
+			// already installed in running framework; Equinox does not have such problem;
+//			assertEquals(14, installedBundles.size());
+
+			assertEquals("org.apache.felix.configadmin", installedBundles.get(0).getBundle().getSymbolicName());
+			assertTrue(installedBundles.get(0).getOwningFeatures().contains(updatedFeature.getFeature().getID()));
+			assertTrue(installedBundles.get(0).getOwningFeatures().contains(externalFeatureId));
 
 			assertEquals("org.apache.felix.gogo.command", installedBundles.get(1).getBundle().getSymbolicName());
 			assertTrue(installedBundles.get(1).getOwningFeatures().contains(updatedFeature.getFeature().getID()));
@@ -422,8 +461,14 @@ public class FeatureRuntimeIntegrationTest {
 			assertEquals("biz.aQute.gogo.commands.provider", installedBundles.get(4).getBundle().getSymbolicName());
 			assertTrue(installedBundles.get(4).getOwningFeatures().contains(updatedFeature.getFeature().getID()));
 
-			assertEquals("org.apache.felix.webconsole", installedBundles.get(13).getBundle().getSymbolicName());
-			assertTrue(installedBundles.get(13).getOwningFeatures().contains(updatedFeature.getFeature().getID()));
+			// FIXME: temporary workaround for Felix OSGi framework bug - apparently it does
+			// not allow installing fragment bundles with same symbolic name as those
+			// already installed in running framework; Equinox does not have such problem;
+//			assertEquals("org.apache.felix.webconsole", installedBundles.get(13).getBundle().getSymbolicName());
+//			assertTrue(installedBundles.get(13).getOwningFeatures().contains(updatedFeature.getFeature().getID()));
+
+			assertEquals("org.apache.felix.webconsole", installedBundles.get(12).getBundle().getSymbolicName());
+			assertTrue(installedBundles.get(12).getOwningFeatures().contains(updatedFeature.getFeature().getID()));
 
 			List<InstalledConfiguration> installedConfigurations = updatedFeature.getInstalledConfigurations();
 			assertFalse(installedConfigurations.isEmpty());
