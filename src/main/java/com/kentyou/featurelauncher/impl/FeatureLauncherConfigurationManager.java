@@ -13,7 +13,8 @@
  */
 package com.kentyou.featurelauncher.impl;
 
-import static com.kentyou.featurelauncher.impl.util.ConfigurationUtil.*;
+import static com.kentyou.featurelauncher.impl.util.ConfigurationUtil.CONFIGURATION_DEFAULT_LOCATION;
+import static com.kentyou.featurelauncher.impl.util.ConfigurationUtil.normalizePid;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -33,6 +34,8 @@ import org.osgi.util.tracker.ServiceTracker;
 import org.osgi.util.tracker.ServiceTrackerCustomizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.kentyou.featurelauncher.impl.util.VariablesUtil;
 
 /**
  * Manages feature configurations via Configuration Admin Service for {@link com.kentyou.featurelauncher.impl.FeatureLauncherImpl}
@@ -54,7 +57,7 @@ public class FeatureLauncherConfigurationManager implements ServiceTrackerCustom
 
 	private final BundleContext bundleContext;
 	private final Map<String, FeatureConfiguration> featureConfigurations;
-
+	private final Map<String, Object> featureVariables;
 	private final ServiceTracker<ConfigurationAdmin, Object> serviceTracker;
 
 	private Class<?> configurationAdminClass;
@@ -66,16 +69,20 @@ public class FeatureLauncherConfigurationManager implements ServiceTrackerCustom
 	private Method getConfigurationPropertiesMethod;
 	private Method updateConfigurationPropertiesMethod;
 
+	private boolean configurationsCreated;
+
 	public FeatureLauncherConfigurationManager(BundleContext bundleContext,
-			Map<String, FeatureConfiguration> featureConfigurations) {
+			Map<String, FeatureConfiguration> featureConfigurations, Map<String, Object> featureVariables) {
 		this.bundleContext = bundleContext;
 		this.featureConfigurations = featureConfigurations;
+		this.featureVariables = featureVariables;
+
+		this.configurationsCreated = false;
 
 		this.serviceTracker = new ServiceTracker<>(this.bundleContext, ConfigurationAdmin.class, this);
 		this.serviceTracker.open(true);
 	}
 
-	// TODO: handle other timeout values as defined in 160.8.4.3
 	public void waitForService(long timeout) {
 		try {
 			if (serviceTracker.waitForService(timeout) == null) {
@@ -84,6 +91,14 @@ public class FeatureLauncherConfigurationManager implements ServiceTrackerCustom
 		} catch (InterruptedException e) {
 			throw new LaunchException("Error awaiting 'ConfigurationAdmin' service!", e);
 		}
+	}
+
+	public boolean serviceAdded() {
+		return (serviceTracker.getTrackingCount() > 0);
+	}
+
+	public boolean configurationsCreated() {
+		return configurationsCreated;
 	}
 
 	public void stop() {
@@ -96,7 +111,7 @@ public class FeatureLauncherConfigurationManager implements ServiceTrackerCustom
 	 */
 	@Override
 	public Object addingService(ServiceReference<ConfigurationAdmin> reference) {
-		LOG.info("Added ConfigurationAdmin service"); // TODO: change to debug level
+		LOG.info("Added ConfigurationAdmin service");
 
 		createConfigurationsIfNeeded(reference);
 
@@ -120,7 +135,7 @@ public class FeatureLauncherConfigurationManager implements ServiceTrackerCustom
 	public void removedService(ServiceReference<ConfigurationAdmin> reference, Object service) {
 		bundleContext.ungetService(reference);
 
-		LOG.info("Removed ConfigurationAdmin service"); // TODO: change to debug level
+		LOG.info("Removed ConfigurationAdmin service");
 	}
 
 	private void createConfigurationsIfNeeded(ServiceReference<ConfigurationAdmin> reference) {
@@ -143,6 +158,8 @@ public class FeatureLauncherConfigurationManager implements ServiceTrackerCustom
 
 				featureConfigurations.forEach((featureConfigurationPid, featureConfiguration) -> createConfiguration(
 						featureConfigurationPid, featureConfiguration, configurationAdminService));
+
+				this.configurationsCreated = true;
 
 			} catch (ClassNotFoundException | NoSuchMethodException | SecurityException e) {
 				LOG.error("Error creating configurations!", e);
@@ -179,7 +196,8 @@ public class FeatureLauncherConfigurationManager implements ServiceTrackerCustom
 			LOG.info(String.format("Creating factory configuration %s", featureConfigurationPid));
 
 			Object configurationObject = getFactoryConfigurationMethod.invoke(configurationAdminService,
-					featureConfiguration.getFactoryPid().get(), normalizePid(featureConfiguration.getPid()), CONFIGURATION_DEFAULT_LOCATION);
+					featureConfiguration.getFactoryPid().get(), normalizePid(featureConfiguration.getPid()),
+					CONFIGURATION_DEFAULT_LOCATION);
 
 			updateConfigurationProperties(configurationObject, featureConfigurationPid, featureConfiguration);
 
@@ -190,11 +208,13 @@ public class FeatureLauncherConfigurationManager implements ServiceTrackerCustom
 
 	private void updateConfigurationProperties(Object configurationObject, String featureConfigurationPid,
 			FeatureConfiguration featureConfiguration) {
-		Dictionary<String, Object> configurationProperties = FrameworkUtil
-				.asDictionary(featureConfiguration.getValues());
+
+		Map<String, Object> configurationProperties = VariablesUtil.INSTANCE
+				.maybeSubstituteVariables(featureConfiguration.getValues(), featureVariables);
 
 		try {
-			updateConfigurationPropertiesMethod.invoke(configurationObject, configurationProperties);
+			updateConfigurationPropertiesMethod.invoke(configurationObject,
+					FrameworkUtil.asDictionary(configurationProperties));
 		} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
 			LOG.error(String.format("Error updating configuration properties %s!", featureConfigurationPid), e);
 		}

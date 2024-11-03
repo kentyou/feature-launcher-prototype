@@ -13,7 +13,11 @@
  */
 package com.kentyou.featurelauncher.impl;
 
+import static com.kentyou.featurelauncher.impl.FeatureLauncherConfigurationManager.CONFIGURATION_TIMEOUT_DEFAULT;
+import static com.kentyou.featurelauncher.impl.FeatureLauncherImplConstants.CONFIGURATION_ADMIN_IMPL_DEFAULT;
 import static org.osgi.service.featurelauncher.FeatureLauncherConstants.BUNDLE_START_LEVELS;
+import static org.osgi.service.featurelauncher.FeatureLauncherConstants.BUNDLE_START_LEVEL_METADATA;
+import static org.osgi.service.featurelauncher.FeatureLauncherConstants.CONFIGURATION_TIMEOUT;
 import static org.osgi.service.featurelauncher.FeatureLauncherConstants.FRAMEWORK_LAUNCHING_PROPERTIES;
 
 import java.io.IOException;
@@ -27,6 +31,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
@@ -36,6 +42,7 @@ import org.osgi.framework.Constants;
 import org.osgi.framework.FrameworkEvent;
 import org.osgi.framework.launch.Framework;
 import org.osgi.framework.launch.FrameworkFactory;
+import org.osgi.framework.startlevel.BundleStartLevel;
 import org.osgi.framework.startlevel.FrameworkStartLevel;
 import org.osgi.service.feature.Feature;
 import org.osgi.service.feature.FeatureBundle;
@@ -54,10 +61,11 @@ import com.kentyou.featurelauncher.impl.decorator.BundleStartLevelsFeatureExtens
 import com.kentyou.featurelauncher.impl.decorator.FrameworkLaunchingPropertiesFeatureExtensionHandler;
 import com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryFactoryImpl;
 import com.kentyou.featurelauncher.impl.util.BundleEventUtil;
-import com.kentyou.featurelauncher.impl.util.FeatureDecorationUtil;
+import com.kentyou.featurelauncher.impl.util.DecorationUtil;
 import com.kentyou.featurelauncher.impl.util.FileSystemUtil;
 import com.kentyou.featurelauncher.impl.util.FrameworkEventUtil;
 import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
+import com.kentyou.featurelauncher.impl.util.VariablesUtil;
 
 /**
  * 160.4 The Feature Launcher
@@ -67,6 +75,12 @@ import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
  */
 public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implements FeatureLauncher {
 	private static final Logger LOG = LoggerFactory.getLogger(FeatureLauncherImpl.class);
+	
+	private final FeatureService featureService;
+	
+	public FeatureLauncherImpl() {
+		this.featureService = ServiceLoaderUtil.loadFeatureService();
+	}
 
 	/* 
 	 * (non-Javadoc)
@@ -86,8 +100,6 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 	@Override
 	public LaunchBuilder launch(Reader jsonReader) {
 		Objects.requireNonNull(jsonReader, "Feature JSON cannot be null!");
-
-		FeatureService featureService = ServiceLoaderUtil.loadFeatureService();
 
 		try {
 			Feature feature = featureService.readFeature(jsonReader);
@@ -110,6 +122,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 		private List<FeatureDecorator> decorators;
 		private Map<String, FeatureExtensionHandler> extensionHandlers;
 		private FeatureLauncherConfigurationManager featureConfigurationManager;
+		private long configurationTimeout;
 
 		LaunchBuilderImpl(Feature feature) {
 			Objects.requireNonNull(feature, "Feature cannot be null!");
@@ -123,6 +136,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			this.frameworkProps = new HashMap<>();
 			this.decorators = new ArrayList<>();
 			this.extensionHandlers = new HashMap<>();
+			this.configurationTimeout = CONFIGURATION_TIMEOUT_DEFAULT;
 		}
 
 		/* 
@@ -235,9 +249,9 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			//////////////////////////////////////
 			// 160.4.3.1: Feature Decoration
 			try {
-				feature = FeatureDecorationUtil.executeFeatureDecorators(feature, decorators);
+				feature = DecorationUtil.executeFeatureDecorators(featureService, feature, decorators);
 
-				feature = FeatureDecorationUtil.executeFeatureExtensionHandlers(feature, extensionHandlers);
+				feature = DecorationUtil.executeFeatureExtensionHandlers(featureService, feature, extensionHandlers);
 			} catch (AbandonOperationException e) {
 				throw new LaunchException("Feature decoration handling failed!", e);
 			}
@@ -249,45 +263,65 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 
 			///////////////////////////////////////////
 			// 160.4.3.3: Creating a Framework instance
-			Framework framework = createFramework(frameworkFactory, getFrameworkProperties());
+			Framework framework = createFramework(frameworkFactory, mergeFrameworkProperties());
 
 			/////////////////////////////////////////////////////////
 			// 160.4.3.4: Installing bundles and configurations
 			installBundles(framework);
 
-			createConfigurationAdminTrackerIfNeeded(framework.getBundleContext());
+			maybeCreateConfigurationAdminTracker(framework.getBundleContext());
+
+			maybeSetCustomConfigurationTimeout();
 
 			//////////////////////////////////////////
 			// 160.4.3.5: Starting the framework
 			startFramework(framework);
 
-			try {
-				waitForConfigurationAdminTrackerIfNeeded(
-						FeatureLauncherConfigurationManager.CONFIGURATION_TIMEOUT_DEFAULT);
-			} finally {
-				stopConfigurationAdminTracker();
-			}
+			maybeWaitForConfigurationAdminTracker();
 
 			return framework;
 		}
 
-		private Map<String, String> getFrameworkProperties() {
-			Map<String, String> frameworkProperties = new HashMap<>(frameworkProps);
+		private Map<String, String> mergeFrameworkProperties() {
+			Map<String, Object> rawProperties = new HashMap<>(frameworkProps);
 
-			if (FeatureDecorationUtil.hasFrameworkLaunchingPropertiesFeatureExtension(feature.getExtensions())) {
+			if (DecorationUtil.hasFrameworkLaunchingPropertiesFeatureExtension(feature.getExtensions())) {
 				try {
-					FrameworkLaunchingPropertiesFeatureExtensionHandler frameworkLaunchingPropertiesFeatureExtensionHandler = FeatureDecorationUtil
+					FrameworkLaunchingPropertiesFeatureExtensionHandler frameworkLaunchingPropertiesFeatureExtensionHandler = DecorationUtil
 							.getBuiltInHandlerForExtension(FRAMEWORK_LAUNCHING_PROPERTIES);
 
-					frameworkProperties
-							.putAll(frameworkLaunchingPropertiesFeatureExtensionHandler.getFrameworkProperties());
+					rawProperties.putAll(frameworkLaunchingPropertiesFeatureExtensionHandler.getFrameworkProperties());
 
 				} catch (AbandonOperationException e) {
 					throw new LaunchException(e.getMessage(), e);
 				}
 			}
 
-			return frameworkProperties;
+			Map<String, Object> properties = VariablesUtil.INSTANCE.maybeSubstituteVariables(rawProperties,
+					mergeVariables());
+
+			return properties.entrySet().stream()
+					.collect(Collectors.toMap(e -> String.valueOf(e.getKey()), e -> String.valueOf(e.getValue())));
+		}
+
+		private Map<String, Object> mergeVariables() {
+			Map<String, Object> allVariables = new HashMap<>(feature.getVariables());
+
+			if (!variables.isEmpty()) {
+				allVariables.putAll(variables);
+			}
+
+			ensureVariablesNotNull(allVariables);
+
+			return allVariables;
+		}
+
+		private void ensureVariablesNotNull(Map<String, Object> allVariables) {
+			for (Map.Entry<String, Object> variable : allVariables.entrySet()) {
+				if (variable.getValue() == null) {
+					throw new LaunchException(String.format("No value provided for variable %s!", variable.getKey()));
+				}
+			}
 		}
 
 		private Framework createFramework(FrameworkFactory frameworkFactory, Map<String, String> frameworkProperties) {
@@ -306,9 +340,9 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 		}
 
 		private void maybeSetFrameworkStartLevel(Framework framework) {
-			if (FeatureDecorationUtil.hasBundleStartLevelsFeatureExtension(feature.getExtensions())) {
+			if (DecorationUtil.hasBundleStartLevelsFeatureExtension(feature.getExtensions())) {
 				try {
-					BundleStartLevelsFeatureExtensionHandler bundleStartLevelsFeatureExtensionHandler = FeatureDecorationUtil
+					BundleStartLevelsFeatureExtensionHandler bundleStartLevelsFeatureExtensionHandler = DecorationUtil
 							.getBuiltInHandlerForExtension(BUNDLE_START_LEVELS);
 
 					if (bundleStartLevelsFeatureExtensionHandler.hasMinimumFrameworkStartLevel()) {
@@ -323,9 +357,9 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 		}
 
 		private void maybeSetInitialBundleStartLevel(Framework framework) {
-			if (FeatureDecorationUtil.hasBundleStartLevelsFeatureExtension(feature.getExtensions())) {
+			if (DecorationUtil.hasBundleStartLevelsFeatureExtension(feature.getExtensions())) {
 				try {
-					BundleStartLevelsFeatureExtensionHandler bundleStartLevelsFeatureExtensionHandler = FeatureDecorationUtil
+					BundleStartLevelsFeatureExtensionHandler bundleStartLevelsFeatureExtensionHandler = DecorationUtil
 							.getBuiltInHandlerForExtension(BUNDLE_START_LEVELS);
 
 					if (bundleStartLevelsFeatureExtensionHandler.hasDefaultBundleStartLevel()) {
@@ -346,8 +380,10 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 
 				maybeSetFrameworkStartLevel(framework);
 
-				// TODO: once start levels are involved, bundles can be started transiently,
-				// before call to framework.start()
+				maybeInstallAndStartDefaultConfigurationAdminTracker(framework.getBundleContext());
+
+				maybeWaitForConfigurationsToBeCreated();
+
 				startBundles();
 
 			} catch (BundleException | InterruptedException e) {
@@ -372,30 +408,78 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			}
 		}
 
-		private void createConfigurationAdminTrackerIfNeeded(BundleContext bundleContext) {
+		private void maybeCreateConfigurationAdminTracker(BundleContext bundleContext) {
 			if (featureConfigurationManager == null && !feature.getConfigurations().isEmpty()) {
 				featureConfigurationManager = new FeatureLauncherConfigurationManager(bundleContext,
-						feature.getConfigurations());
+						feature.getConfigurations(), mergeVariables());
 
 				LOG.info(String.format("Started ConfigurationAdmin service tracker for bundle '%s'",
 						bundleContext.getBundle().getSymbolicName()));
 			}
 		}
 
-		private void waitForConfigurationAdminTrackerIfNeeded(long timeout) {
-			if (featureConfigurationManager != null) {
-				featureConfigurationManager.waitForService(timeout);
-
-				LOG.info("'ConfigurationAdmin' service is available!");
+		private void maybeInstallAndStartDefaultConfigurationAdminTracker(BundleContext bundleContext)
+				throws BundleException {
+			if (this.configurationTimeout == 0) {
+				ID configadminImplBundleID = featureService.getIDfromMavenCoordinates(CONFIGURATION_ADMIN_IMPL_DEFAULT);
+				Bundle configadminImplBundle = installBundle(bundleContext, configadminImplBundleID);
+				if (configadminImplBundle != null) {
+					configadminImplBundle.start();
+				}
 			}
 		}
 
-		private void stopConfigurationAdminTracker() {
+		private void maybeWaitForConfigurationAdminTracker() {
+			if ((featureConfigurationManager != null) && (this.configurationTimeout == CONFIGURATION_TIMEOUT_DEFAULT)) {
+				try {
+					featureConfigurationManager.waitForService(this.configurationTimeout);
+
+					LOG.info("'ConfigurationAdmin' service is available!");
+				} finally {
+					maybeStopConfigurationAdminTracker();
+				}
+			}
+		}
+
+		private void maybeStopConfigurationAdminTracker() {
 			if (featureConfigurationManager != null) {
 				featureConfigurationManager.stop();
 				featureConfigurationManager = null;
 
 				LOG.info("Stopped ConfigurationAdmin service tracker");
+			}
+		}
+
+		private boolean maybeWaitForConfigurationsToBeCreated() throws InterruptedException {
+			boolean waitForConfigurationsToBeCreated = false;
+
+			if (!feature.getConfigurations().isEmpty() && (featureConfigurationManager != null)) {
+				waitForConfigurationsToBeCreated = ((this.configurationTimeout == 0)
+						&& (!featureConfigurationManager.serviceAdded()
+								|| !featureConfigurationManager.configurationsCreated()));
+
+				while (waitForConfigurationsToBeCreated) {
+
+					TimeUnit.MILLISECONDS.sleep(10);
+
+					waitForConfigurationsToBeCreated = (!featureConfigurationManager.serviceAdded()
+							|| !featureConfigurationManager.configurationsCreated());
+
+					System.out.println();
+				}
+			}
+
+			return waitForConfigurationsToBeCreated;
+		}
+
+		private void maybeSetCustomConfigurationTimeout() {
+			if (!this.configuration.isEmpty() && this.configuration.containsKey(CONFIGURATION_TIMEOUT)) {
+				long customConfigurationTimeout = Long
+						.parseLong(this.configuration.get(CONFIGURATION_TIMEOUT).toString());
+
+				if (customConfigurationTimeout == 0 || customConfigurationTimeout == -1) {
+					this.configurationTimeout = customConfigurationTimeout;
+				}
 			}
 		}
 
@@ -410,7 +494,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 				LOG.info(String.format("There are %d bundle(s) to install", this.feature.getBundles().size()));
 
 				for (FeatureBundle featureBundle : this.feature.getBundles()) {
-					installBundle(framework, featureBundle);
+					installBundle(framework.getBundleContext(), featureBundle);
 				}
 
 			} else {
@@ -418,20 +502,38 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			}
 		}
 
-		private void installBundle(Framework framework, FeatureBundle featureBundle) {
-			ID featureBundleID = featureBundle.getID();
+		private void installBundle(BundleContext bundleContext, FeatureBundle featureBundle) {
+			Bundle installedBundle = installBundle(bundleContext, featureBundle.getID());
 
+			if (installedBundle != null) {
+				maybeSetBundleStartLevel(installedBundle, featureBundle.getMetadata());
+
+				installedBundles.add(installedBundle);
+			}
+		}
+
+		private Bundle installBundle(BundleContext bundleContext, ID featureBundleID) {
 			try (InputStream featureBundleIs = getArtifact(featureBundleID)) {
 				if (featureBundleIs.available() != 0) {
-					Bundle installedBundle = framework.getBundleContext().installBundle(featureBundleID.toString(),
-							featureBundleIs);
-					installedBundles.add(installedBundle);
+					Bundle installedBundle = bundleContext.installBundle(featureBundleID.toString(), featureBundleIs);
 
 					LOG.info(String.format("Installed bundle '%s'", installedBundle.getSymbolicName()));
+
+					return installedBundle;
 				}
 			} catch (IOException | BundleException e) {
 				throw new LaunchException(String.format("Could not install bundle '%s'!", featureBundleID.toString()),
 						e);
+			}
+
+			return null;
+		}
+
+		protected void maybeSetBundleStartLevel(Bundle bundle, Map<String, Object> metadata) {
+			if (metadata != null && metadata.containsKey(BUNDLE_START_LEVEL_METADATA)) {
+				int startlevel = Integer.valueOf(metadata.get(BUNDLE_START_LEVEL_METADATA).toString()).intValue();
+
+				bundle.adapt(BundleStartLevel.class).setStartLevel(startlevel);
 			}
 		}
 

@@ -39,11 +39,13 @@ import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
 import org.osgi.service.featurelauncher.decorator.DecoratorBuilderFactory;
 import org.osgi.service.featurelauncher.decorator.FeatureDecorator;
 
-import com.kentyou.featurelauncher.impl.util.FeatureDecorationUtil;
+import com.kentyou.featurelauncher.impl.util.DecorationUtil;
 import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
 
 /**
- * Tests {@link com.kentyou.featurelauncher.impl.util.FeatureDecorationUtil.executeFeatureDecorators(Feature, List<FeatureDecorator>)}
+ * Tests
+ * {@link com.kentyou.featurelauncher.impl.util.FeatureDecorationUtil.executeFeatureDecorators(Feature,
+ * List<FeatureDecorator>)}
  * 
  * @author Michael H. Siemaszko (mhs@into.software)
  * @since Oct 28, 2024
@@ -93,7 +95,7 @@ public class FeatureDecoratorImplTest {
 			}
 		};
 
-		Feature decoratedFeature = FeatureDecorationUtil.executeFeatureDecorators(feature,
+		Feature decoratedFeature = DecorationUtil.executeFeatureDecorators(featureService, feature,
 				List.of(featureBundlesDecorator));
 		assertNotNull(decoratedFeature);
 
@@ -129,7 +131,7 @@ public class FeatureDecoratorImplTest {
 			}
 		};
 
-		Feature decoratedFeature = FeatureDecorationUtil.executeFeatureDecorators(feature,
+		Feature decoratedFeature = DecorationUtil.executeFeatureDecorators(featureService, feature,
 				List.of(featureConfigurationsDecorator));
 		assertNotNull(decoratedFeature);
 
@@ -161,7 +163,7 @@ public class FeatureDecoratorImplTest {
 			}
 		};
 
-		Feature decoratedFeature = FeatureDecorationUtil.executeFeatureDecorators(feature,
+		Feature decoratedFeature = DecorationUtil.executeFeatureDecorators(featureService, feature,
 				List.of(featureVariablesDecorator));
 		assertNotNull(decoratedFeature);
 
@@ -193,7 +195,7 @@ public class FeatureDecoratorImplTest {
 			}
 		};
 
-		Feature decoratedFeature = FeatureDecorationUtil.executeFeatureDecorators(feature,
+		Feature decoratedFeature = DecorationUtil.executeFeatureDecorators(featureService, feature,
 				List.of(featureExtensionsDecorator));
 		assertNotNull(decoratedFeature);
 
@@ -227,7 +229,7 @@ public class FeatureDecoratorImplTest {
 			}
 		};
 
-		Feature decoratedFeature = FeatureDecorationUtil.executeFeatureDecorators(feature,
+		Feature decoratedFeature = DecorationUtil.executeFeatureDecorators(featureService, feature,
 				List.of(featureNoOpDecorator));
 		assertNotNull(decoratedFeature);
 
@@ -260,7 +262,7 @@ public class FeatureDecoratorImplTest {
 			}
 		};
 
-		assertThrows(AbandonOperationException.class,
-				() -> FeatureDecorationUtil.executeFeatureDecorators(feature, List.of(featureInvalidDecorator)));
+		assertThrows(AbandonOperationException.class, () -> DecorationUtil
+				.executeFeatureDecorators(featureService, feature, List.of(featureInvalidDecorator)));
 	}
 }

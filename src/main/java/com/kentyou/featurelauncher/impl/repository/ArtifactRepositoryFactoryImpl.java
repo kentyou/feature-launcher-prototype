@@ -24,8 +24,6 @@ import java.util.Objects;
 
 import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 import org.osgi.service.featurelauncher.repository.ArtifactRepositoryFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.kentyou.featurelauncher.impl.util.FileSystemUtil;
 
@@ -36,8 +34,7 @@ import com.kentyou.featurelauncher.impl.util.FileSystemUtil;
  * @since Sep 15, 2024
  */
 public class ArtifactRepositoryFactoryImpl implements ArtifactRepositoryFactory {
-	private static final Logger LOG = LoggerFactory.getLogger(ArtifactRepositoryFactoryImpl.class);
-	
+
 	/* 
 	 * (non-Javadoc)
 	 * @see org.osgi.service.featurelauncher.repository.ArtifactRepositoryFactory#createRepository(java.nio.file.Path)

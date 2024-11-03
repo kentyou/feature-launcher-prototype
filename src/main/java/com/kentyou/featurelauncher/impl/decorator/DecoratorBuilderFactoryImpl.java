@@ -23,8 +23,6 @@ import org.osgi.service.feature.FeatureService;
 import org.osgi.service.feature.ID;
 import org.osgi.service.featurelauncher.decorator.DecoratorBuilderFactory;
 
-import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
-
 /**
  * Implementation of {@link org.osgi.service.featurelauncher.decorator.DecoratorBuilderFactory}
  * 
@@ -32,7 +30,11 @@ import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
  * @since Sep 15, 2024
  */
 public class DecoratorBuilderFactoryImpl implements DecoratorBuilderFactory {
-	private static FeatureService featureService = ServiceLoaderUtil.loadFeatureService();
+	private final FeatureService featureService;
+
+	public DecoratorBuilderFactoryImpl(FeatureService featureService) {
+		this.featureService = featureService;
+	}
 
 	/* 
 	 * (non-Javadoc)

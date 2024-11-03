@@ -14,6 +14,7 @@
 package com.kentyou.featurelauncher.impl.runtime;
 
 import static org.osgi.service.feature.FeatureExtension.Kind.MANDATORY;
+import static org.osgi.service.featurelauncher.FeatureLauncherConstants.BUNDLE_START_LEVEL_METADATA;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -35,11 +36,13 @@ import java.util.Set;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.BundleException;
 import org.osgi.framework.InvalidSyntaxException;
+import org.osgi.framework.startlevel.BundleStartLevel;
 import org.osgi.framework.wiring.BundleRevision;
 import org.osgi.service.cm.Configuration;
 import org.osgi.service.component.annotations.Activate;
@@ -60,15 +63,19 @@ import org.osgi.service.featurelauncher.runtime.FeatureRuntimeException;
 import org.osgi.service.featurelauncher.runtime.InstalledBundle;
 import org.osgi.service.featurelauncher.runtime.InstalledConfiguration;
 import org.osgi.service.featurelauncher.runtime.InstalledFeature;
+import org.osgi.service.featurelauncher.runtime.MergeOperationType;
 import org.osgi.service.featurelauncher.runtime.RuntimeBundleMerge;
+import org.osgi.service.featurelauncher.runtime.RuntimeBundleMerge.BundleMapping;
+import org.osgi.service.featurelauncher.runtime.RuntimeBundleMerge.FeatureBundleDefinition;
 import org.osgi.service.featurelauncher.runtime.RuntimeConfigurationMerge;
+import org.osgi.service.featurelauncher.runtime.RuntimeConfigurationMerge.FeatureConfigurationDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryFactoryImpl;
 import com.kentyou.featurelauncher.impl.repository.FileSystemArtifactRepository;
 import com.kentyou.featurelauncher.impl.util.ArtifactRepositoryUtil;
-import com.kentyou.featurelauncher.impl.util.FeatureDecorationUtil;
+import com.kentyou.featurelauncher.impl.util.DecorationUtil;
 
 /**
  * 160.5 The Feature Runtime Service
@@ -203,7 +210,14 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 	 */
 	@Override
 	public void remove(ID featureId) {
-		removeFeature(featureId);
+		Objects.requireNonNull(featureId, "Feature ID cannot be null!");
+
+		InstalledFeature installedFeature = getInstalledFeatureById(featureId);
+
+		Objects.requireNonNull(installedFeature,
+				String.format("No feature matching %s ID could be found!", featureId.toString()));
+
+		new RemoveOperationBuilderImpl(installedFeature.getFeature()).remove();
 	}
 
 	/* 
@@ -238,15 +252,15 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 	}
 
 	abstract class AbstractOperationBuilderImpl<T extends OperationBuilder<T>> implements OperationBuilder<T> {
-		private Feature feature;
-		private boolean isCompleted;
-		private boolean useDefaultRepositories;
-		private Map<String, ArtifactRepository> artifactRepositories;
-		private RuntimeBundleMerge runtimeBundleMerge;
-		private RuntimeConfigurationMerge runtimeConfigurationMerge;
-		private Map<String, Object> variables;
-		private List<FeatureDecorator> decorators;
-		private Map<String, FeatureExtensionHandler> extensionHandlers;
+		protected Feature feature;
+		protected boolean isCompleted;
+		protected boolean useDefaultRepositories;
+		protected Map<String, ArtifactRepository> artifactRepositories;
+		protected RuntimeBundleMerge runtimeBundleMerge;
+		protected RuntimeConfigurationMerge runtimeConfigurationMerge;
+		protected Map<String, Object> variables;
+		protected List<FeatureDecorator> decorators;
+		protected Map<String, FeatureExtensionHandler> extensionHandlers;
 
 		public AbstractOperationBuilderImpl(Feature feature) {
 			Objects.requireNonNull(feature, "Feature cannot be null!");
@@ -386,7 +400,7 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 			validateFeatureExtensions(feature);
 
 			// @formatter:off
-	        List<ID> featureBundles = feature.getBundles().stream()
+	        List<ID> featureBundlesIDs = feature.getBundles().stream()
 	        		.map(featureBundle -> featureBundle.getID())
 	        		.collect(Collectors.toList());
 	        // @formatter:on
@@ -395,7 +409,7 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 			if (installedFeaturesToBundles.containsKey(featureId)) {
 				LOG.info(String.format("Updating feature %s", featureId));
 
-				if (installedFeaturesToBundles.get(featureId).equals(featureBundles)) {
+				if (installedFeaturesToBundles.get(featureId).equals(featureBundlesIDs)) {
 					// No work to do, already installed
 					LOG.info(String.format("The feature %s is already up to date", featureId));
 
@@ -410,16 +424,17 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 			}
 
 			// Feature Decoration
+			Feature originalFeature = feature;
 			try {
-				feature = FeatureDecorationUtil.executeFeatureDecorators(feature, decorators);
+				feature = DecorationUtil.executeFeatureDecorators(featureService, feature, decorators);
 
-				feature = FeatureDecorationUtil.executeFeatureExtensionHandlers(feature, extensionHandlers);
+				feature = DecorationUtil.executeFeatureExtensionHandlers(featureService, feature, extensionHandlers);
 			} catch (AbandonOperationException e) {
 				throw new FeatureRuntimeException("Feature decoration handling failed!", e);
 			}
 
 			// Install bundles
-			List<InstalledBundle> installedBundles = installBundles(feature, featureBundles);
+			List<InstalledBundle> installedBundles = installBundles(feature, featureBundlesIDs);
 
 			// Install configurations
 			List<InstalledConfiguration> installedConfigurations = installConfigurations(feature);
@@ -428,10 +443,8 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 			startBundles(featureId, installedBundles);
 
 			// construct installed feature
-			boolean isInitialLaunch = false; // TODO: check if feature was installed by FeatureLauncher
-
-			InstalledFeature installedFeature = constructInstalledFeature(feature, isInitialLaunch, installedBundles,
-					installedConfigurations);
+			InstalledFeature installedFeature = constructInstalledFeature(feature, originalFeature,
+					feature != originalFeature, false, installedBundles, installedConfigurations);
 
 			// update "owning features" in other 'installedFeatures'
 			updateInstalledFeaturesOnAddOrUpdate(installedFeature);
@@ -441,6 +454,157 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 			return installedFeature;
 		}
 
+		// TODO: clarify with Tim understanding / how this is currently implemented and
+		// integrate this then
+		protected Stream<BundleMapping> maybeRunBundleMerge(MergeOperationType operation, Feature feature) {
+			if (runtimeBundleMerge != null) {
+
+				for (FeatureBundle featureBundle : feature.getBundles()) {
+					ID featureBundleId = featureBundle.getID();
+
+					List<InstalledBundle> conflictingInstalledBundles = new ArrayList<>();
+
+					List<FeatureBundleDefinition> conflictingFeatureBundles = new ArrayList<>();
+
+					for (InstalledFeature existingFeature : installedFeatures) {
+						for (InstalledBundle existingInstalledBundle : existingFeature.getInstalledBundles()) {
+
+							boolean isInConflict = ((featureBundleId.getGroupId())
+									.equals(existingInstalledBundle.getBundleId().getGroupId())
+									&& (featureBundleId.getArtifactId())
+											.equals(existingInstalledBundle.getBundleId().getArtifactId())
+									&& !featureBundleId.equals(existingInstalledBundle.getBundleId()));
+
+							if (isInConflict) {
+								conflictingInstalledBundles.add(existingInstalledBundle);
+
+								FeatureBundleDefinition conflictingFeatureBundle = new FeatureBundleDefinition() {
+
+									@Override
+									public FeatureBundle getFeatureBundle() {
+										// @formatter:off
+										return getFeature().getBundles().stream()
+												.filter(fb -> featureBundleId.equals(fb.getID()))
+												.findFirst()
+												.orElseThrow();
+										// @formatter:on
+									}
+
+									@Override
+									public Feature getFeature() {
+										return existingFeature.isDecorated() ? existingFeature.getOriginalFeature()
+												: existingFeature.getFeature();
+									}
+								};
+
+								conflictingFeatureBundles.add(conflictingFeatureBundle);
+							}
+						}
+					}
+
+					if (!conflictingInstalledBundles.isEmpty()) {
+						// @formatter:off
+						return runtimeBundleMerge.mergeBundle(
+								operation, 
+								feature,
+								featureBundle,
+								conflictingInstalledBundles,
+								conflictingFeatureBundles);
+						// @formatter:on
+					}
+				}
+			}
+
+			return Stream.empty();
+		}
+
+		// TODO: clarify with Tim understanding / how this is currently implemented and
+		// integrate this then
+		protected Map<String, Object> maybeRunConfigurationMerge(MergeOperationType operation, Feature feature) {
+			if (runtimeConfigurationMerge != null) {
+
+				for (Map.Entry<String, FeatureConfiguration> featureConfigurationEntry : feature.getConfigurations()
+						.entrySet()) {
+					String featureConfigurationPID = featureConfigurationEntry.getKey();
+					FeatureConfiguration featureConfiguration = featureConfigurationEntry.getValue();
+
+					InstalledConfiguration conflictingInstalledConfiguration = null;
+
+					List<FeatureConfigurationDefinition> conflictingFeatureConfigurations = new ArrayList<>();
+
+					INSTALLED_FEATURES: for (InstalledFeature existingFeature : installedFeatures) {
+						for (InstalledConfiguration existingInstalledConfiguration : existingFeature
+								.getInstalledConfigurations()) {
+
+							boolean isInConflict = featureConfigurationPID
+									.equals(existingInstalledConfiguration.getPid());
+
+							if (isInConflict) {
+								conflictingInstalledConfiguration = existingInstalledConfiguration;
+
+								FeatureConfigurationDefinition conflictingFeatureConfiguration = new FeatureConfigurationDefinition() {
+
+									@Override
+									public FeatureConfiguration getFeatureConfiguration() {
+										// @formatter:off
+										return getFeature().getConfigurations().values().stream()
+												.filter(fc -> featureConfigurationPID.equals(fc.getPid()))
+												.findFirst()
+												.orElseThrow();
+										// @formatter:on
+									}
+
+									@Override
+									public Feature getFeature() {
+										return existingFeature.isDecorated() ? existingFeature.getOriginalFeature()
+												: existingFeature.getFeature();
+									}
+								};
+
+								conflictingFeatureConfigurations.add(conflictingFeatureConfiguration);
+
+								break INSTALLED_FEATURES;
+							}
+						}
+					}
+
+					if (conflictingInstalledConfiguration != null) {
+
+						// @formatter:off
+						return runtimeConfigurationMerge.mergeConfiguration(
+								operation,
+								feature,
+								featureConfiguration,
+								conflictingInstalledConfiguration,
+								conflictingFeatureConfigurations);
+						// @formatter:on
+					}
+				}
+			}
+
+			return Collections.emptyMap();
+		}
+
+		protected void removeFeature(ID featureId) {
+			// remove only those bundles which are not referenced by other features
+			Deque<ID> bundleIDsForRemoval = getBundleIDsForRemoval(featureId);
+
+			stopBundles(bundleIDsForRemoval);
+
+			uninstallBundles(bundleIDsForRemoval);
+
+			// remove only those configurations which are not referenced by other features
+			Set<String> configurationPIDsForRemoval = getConfigurationPIDsForRemoval(featureId);
+
+			removeFeatureConfigurations(configurationPIDsForRemoval);
+
+			// remove feature from list of installed features
+			installedFeatures.removeIf(f -> featureId.equals(f.getFeature().getID()));
+
+			// update "owning features" in other installed features
+			updateInstalledFeaturesOnRemove(featureId);
+		}
+
 		protected List<InstalledBundle> installBundles(Feature feature, List<ID> featureBundles) {
 			List<InstalledBundle> installedBundles = new ArrayList<>();
 			for (FeatureBundle featureBundle : feature.getBundles()) {
@@ -448,29 +612,47 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 
 				boolean bundleAlreadyInstalledByRuntime = installedBundlesByIdentifier.containsKey(bundleId);
 
-				boolean bundleAlreadyPresentInRunningFramework = duplicatesExistingBundle(bundleId);
+				if (!bundleAlreadyInstalledByRuntime) {
 
-				if (!bundleAlreadyInstalledByRuntime && !bundleAlreadyPresentInRunningFramework) {
-					Bundle bundle = installBundle(bundleId);
-					if (bundle != null) {
-						installedBundlesByIdentifier.put(bundleId, bundle);
+					Bundle bundle = null;
 
-						installedBundles.add(
-								constructInstalledBundle(bundleId, bundle, constructOwningFeatures(feature.getID())));
+					try {
+						bundle = installBundle(bundleId);
+
+						if (bundle != null) {
+							installedBundlesByIdentifier.put(bundleId, bundle);
+
+							maybeSetBundleStartLevel(bundle, featureBundle.getMetadata());
+
+							installedBundles.add(constructInstalledBundle(bundleId, bundle,
+									constructOwningFeatures(feature.getID())));
+						}
+
+					} catch (BundleException e) {
+						if (BundleException.DUPLICATE_BUNDLE_ERROR == e.getType()
+								|| (BundleException.REJECTED_BY_HOOK == e.getType())) {
+							LOG.info(String.format("Bundle %s duplicates bundle already present in running framework!",
+									bundleId));
+
+							ID aliasBundleId = getAliasBundleId(bundleId);
+
+							installedBundles.add(constructExternallyInstalledBundle(feature.getID(), bundleId,
+									(aliasBundleId != null) ? List.of(aliasBundleId) : Collections.emptyList()));
+
+						} else {
+							throw new FeatureRuntimeException(String.format("Could not install bundle '%s'!", bundleId),
+									e);
+						}
+
+					} catch (IOException e) {
+						throw new FeatureRuntimeException(String.format("Could not install bundle '%s'!", bundleId), e);
 					}
+
 				} else {
-					if (bundleAlreadyInstalledByRuntime) {
-						LOG.info(String.format("Bundle %s duplicates bundle already installed by feature runtime!",
-								bundleId));
+					LOG.info(String.format("Bundle %s duplicates bundle already installed by feature runtime!",
+							bundleId));
 
-						installedBundles.add(constructAlreadyInstalledBundle(feature.getID(), bundleId));
-					} else if (bundleAlreadyPresentInRunningFramework) {
-						LOG.info(String.format("Bundle %s duplicates bundle already present in running framework!",
-								bundleId));
-
-						installedBundles.add(constructExternallyInstalledBundle(feature.getID(), bundleId));
-
-					}
+					installedBundles.add(constructAlreadyInstalledBundle(feature.getID(), bundleId));
 				}
 			}
 
@@ -479,7 +661,24 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 			return installedBundles;
 		}
 
-		protected Bundle installBundle(ID featureBundleID) {
+		protected ID getAliasBundleId(ID bundleId) {
+			final Map.Entry<String, String> bundleSymbolicNameAndVersion = getBundleSymbolicNameAndVersion(bundleId);
+			if (bundleSymbolicNameAndVersion != null) {
+				// @formatter:off
+				return bundleIdsToSymbolicNamesVersions.entrySet().stream()
+						.filter(entry -> ((bundleSymbolicNameAndVersion.getKey())
+								.equals(entry.getValue().getKey())
+								&& (bundleSymbolicNameAndVersion.getValue())
+										.equals(entry.getValue().getValue())))
+						.map(entry -> entry.getKey())
+						.findFirst()
+						.orElse(null);
+				// @formatter:on
+			}
+			return null;
+		}
+
+		protected Bundle installBundle(ID featureBundleID) throws IOException, BundleException {
 			try (InputStream featureBundleIs = getArtifact(featureBundleID)) {
 				if (featureBundleIs.available() != 0) {
 					Bundle installedBundle = bundleContext.installBundle(featureBundleID.toString(), featureBundleIs);
@@ -488,8 +687,6 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 
 					return installedBundle;
 				}
-			} catch (IOException | BundleException e) {
-				throw new FeatureRuntimeException(String.format("Could not install bundle '%s'!", featureBundleID), e);
 			}
 
 			return null;
@@ -515,7 +712,8 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 
 				if (!allExistingConfigurations.containsKey(configurationPid)) {
 
-					featureRuntimeConfigurationManager.createConfiguration(featureConfiguration);
+					featureRuntimeConfigurationManager.createConfiguration(featureConfiguration,
+							mergeVariables(feature));
 
 					installedConfigurations.add(constructInstalledConfiguration(featureConfiguration,
 							constructOwningFeatures(feature.getID())));
@@ -553,7 +751,7 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 		protected void startBundles(ID featureId, List<InstalledBundle> installedBundles) {
 			for (InstalledBundle installedBundle : installedBundles) {
 				try {
-					if (installedBundle.getBundle() != null) { // only if bundle was not externally installed
+					if (installedBundle.getBundle().getState() == Bundle.INSTALLED) {
 						BundleRevision rev = installedBundle.getBundle().adapt(BundleRevision.class);
 						if (rev != null && (rev.getTypes() & BundleRevision.TYPE_FRAGMENT) == 0) {
 							// Start all but fragment bundles
@@ -563,44 +761,128 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 									installedBundle.getBundle().getSymbolicName()));
 						}
 					}
-
 				} catch (Exception e) {
 					LOG.warn(String.format("An error occurred starting a bundle in feature %s", featureId));
 				}
 			}
 		}
 
-		protected InstalledFeature getInstalledFeatureById(ID featureId) {
-			// @formatter:off
-			return installedFeatures.stream()
-					.filter(f -> featureId.equals(f.getFeature().getID()))
-					.findFirst()
-					.orElse(null);
-			// @formatter:on
+		protected void stopBundles(Deque<ID> bundleIDsToStop) {
+			for (ID bundleIDToStop : bundleIDsToStop) {
+				Bundle bundleForRemoval = installedBundlesByIdentifier.get(bundleIDToStop);
+				if (bundleForRemoval != null) {
+					try {
+						BundleRevision rev = bundleForRemoval.adapt(BundleRevision.class);
+						if (rev != null && (rev.getTypes() & BundleRevision.TYPE_FRAGMENT) == 0) {
+							bundleForRemoval.stop();
+						}
+					} catch (BundleException e) {
+						LOG.warn(String.format("An error occurred stopping bundle %s", bundleIDToStop), e);
+					}
+				}
+			}
 		}
 
-		protected InstalledFeature constructInstalledFeature(Feature feature, boolean isInitialLaunch,
-				List<InstalledBundle> installedBundles, List<InstalledConfiguration> installedConfigurations) {
+		protected void uninstallBundles(Deque<ID> bundleIDsToUninstall) {
+			for (ID bundleIDToRemove : bundleIDsToUninstall) {
+				Bundle bundleForRemoval = installedBundlesByIdentifier.remove(bundleIDToRemove);
+				if (bundleForRemoval != null) {
+					try {
+						bundleForRemoval.uninstall();
+					} catch (BundleException e) {
+						LOG.warn(String.format("An error occurred uninstalling bundle %s", bundleIDToRemove), e);
+					}
+				}
+			}
+		}
+
+		protected Deque<ID> getBundleIDsForRemoval(ID featureId) {
+			// Get all the bundles to remove in "install order", clearing the features map
+			Set<ID> bundlesToRemove = installedFeaturesToBundles.remove(featureId).stream()
+					.collect(Collectors.toCollection(LinkedHashSet::new));
+
+			// Create a deque of bundles to remove, in the order they should be removed
+			Deque<ID> orderedBundleIDsForRemoval = new LinkedList<>();
+			for (ID bundleToRemove : bundlesToRemove) {
+				// Only remove the bundle if no remaining features reference it
+				if (installedFeaturesToBundles.values().stream().noneMatch(c -> c.contains(bundleToRemove))) {
+					// Add to the start of the deque, so that we reverse the install order
+					orderedBundleIDsForRemoval.addFirst(bundleToRemove);
+
+					LOG.info(String.format("Bundle %s is no longer required and will be removed", bundleToRemove));
+				}
+			}
+
+			return orderedBundleIDsForRemoval;
+		}
+
+		protected void removeFeatureConfigurations(Set<String> configurationPIDsForRemoval) {
+			featureRuntimeConfigurationManager.removeConfigurations(configurationPIDsForRemoval);
+		}
+
+		protected Set<String> getConfigurationPIDsForRemoval(ID featureId) {
+			Set<String> configurationPIDsForRemoval = new HashSet<>();
+
+			if (installedFeaturesToConfigurations.containsKey(featureId)) {
+				Set<String> featureConfigurationPIDsToRemove = installedFeaturesToConfigurations.remove(featureId)
+						.stream().collect(Collectors.toSet());
+
+				for (String featureConfigurationPIDToRemove : featureConfigurationPIDsToRemove) {
+					if (installedFeaturesToConfigurations.values().stream()
+							.noneMatch(c -> c.contains(featureConfigurationPIDToRemove))) {
+						configurationPIDsForRemoval.add(featureConfigurationPIDToRemove);
+
+						LOG.info(String.format("Configuration %s will be removed", featureConfigurationPIDToRemove));
+					}
+				}
+			}
+
+			return configurationPIDsForRemoval;
+		}
+
+		protected InstalledFeature constructInstalledFeature(Feature feature, Feature originalFeature,
+				boolean isDecorated, boolean isInitialLaunch, List<InstalledBundle> installedBundles,
+				List<InstalledConfiguration> installedConfigurations) {
 			// @formatter:off
 			return new InstalledFeatureImpl(
 					feature, 
-					isInitialLaunch,
+					originalFeature, 
+					isDecorated, 
+					isInitialLaunch, 
 					installedBundles,
 					installedConfigurations);
 			// @formatter:on
 		}
 
+		protected int getBundleStartLevel(Bundle bundle) {
+			return bundle.adapt(BundleStartLevel.class).getStartLevel();
+		}
+
+		protected void maybeSetBundleStartLevel(Bundle bundle, Map<String, Object> metadata) {
+			if (metadata.containsKey(BUNDLE_START_LEVEL_METADATA)) {
+				int startlevel = Integer.valueOf(metadata.get(BUNDLE_START_LEVEL_METADATA).toString()).intValue();
+
+				bundle.adapt(BundleStartLevel.class).setStartLevel(startlevel);
+			}
+		}
+
 		protected InstalledBundle constructInstalledBundle(ID bundleId, Bundle bundle, List<ID> owningFeatures) {
-			return new InstalledBundleImpl(bundleId, Collections.emptyList(), bundle, 1, owningFeatures); // TODO:
-																											// aliases
+			return constructInstalledBundle(bundleId, Collections.emptyList(), bundle, owningFeatures);
+		}
+
+		protected InstalledBundle constructInstalledBundle(ID bundleId, List<ID> aliases, Bundle bundle,
+				List<ID> owningFeatures) {
+			int startLevel = getBundleStartLevel(bundle);
+
+			return new InstalledBundleImpl(bundleId, aliases, bundle, startLevel, owningFeatures);
 		}
 
 		protected InstalledBundle constructAlreadyInstalledBundle(ID featureId, ID bundleId) {
-			return constructInstalledBundle(bundleId, installedBundlesByIdentifier.get(bundleId),
-					constructBundleOwningFeatures(featureId, bundleId));
+			return constructInstalledBundle(bundleId, Collections.emptyList(),
+					installedBundlesByIdentifier.get(bundleId), constructBundleOwningFeatures(featureId, bundleId));
 		}
 
-		protected InstalledBundle constructExternallyInstalledBundle(ID featureId, ID bundleId) {
+		protected InstalledBundle constructExternallyInstalledBundle(ID featureId, ID bundleId, List<ID> aliases) {
 			Bundle bundle = null;
 
 			Map.Entry<String, String> bundleSymbolicNameAndVersion = getBundleSymbolicNameAndVersion(bundleId);
@@ -608,7 +890,8 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 				bundle = bundleContext.getBundle(existingBundles.get(bundleSymbolicNameAndVersion).longValue());
 			}
 
-			return constructInstalledBundle(bundleId, bundle, constructOwningFeatures(featureId, externalFeatureId));
+			return constructInstalledBundle(bundleId, aliases, bundle,
+					constructOwningFeatures(featureId, externalFeatureId));
 		}
 
 		protected List<ID> constructOwningFeatures(ID... featureIds) {
@@ -673,8 +956,7 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 			} else {
 				Path featureBundlePath = getArtifactPath(featureBundleID);
 				if (featureBundlePath != null) {
-					try {
-						JarFile featureBundleJarFile = new JarFile(featureBundlePath.toFile());
+					try (JarFile featureBundleJarFile = new JarFile(featureBundlePath.toFile())) {
 						Manifest featureBundleJarMf = featureBundleJarFile.getManifest();
 						if ((featureBundleJarMf != null) && (featureBundleJarMf.getMainAttributes() != null)) {
 							String featureBundleSymbolicName = featureBundleJarMf.getMainAttributes()
@@ -700,43 +982,6 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 			}
 
 			return null;
-		}
-
-		protected boolean duplicatesExistingBundle(ID featureBundleID) {
-			if (bundleIdsToSymbolicNamesVersions.containsKey(featureBundleID)) {
-				return existingBundles.containsKey(bundleIdsToSymbolicNamesVersions.get(featureBundleID));
-			} else {
-				Path featureBundlePath = getArtifactPath(featureBundleID);
-				if (featureBundlePath != null) {
-					try {
-						JarFile featureBundleJarFile = new JarFile(featureBundlePath.toFile());
-
-						Manifest featureBundleJarMf = featureBundleJarFile.getManifest();
-
-						if ((featureBundleJarMf != null) && (featureBundleJarMf.getMainAttributes() != null)) {
-							String featureBundleSymbolicName = featureBundleJarMf.getMainAttributes()
-									.getValue("Bundle-SymbolicName");
-							String featureBundleVersion = featureBundleJarMf.getMainAttributes()
-									.getValue("Bundle-Version");
-
-							if ((featureBundleSymbolicName != null) && (featureBundleVersion != null)) {
-								Map.Entry<String, String> bundleSymbolicNameAndVersion = Map
-										.entry(featureBundleSymbolicName, featureBundleVersion);
-
-								bundleIdsToSymbolicNamesVersions.put(featureBundleID, bundleSymbolicNameAndVersion);
-
-								return existingBundles.containsKey(bundleSymbolicNameAndVersion);
-							}
-						}
-
-					} catch (IOException e) {
-						LOG.error(String.format("Error checking for if bundle %s duplicates existing bundles!",
-								featureBundleID), e);
-					}
-				}
-			}
-
-			return false;
 		}
 
 		protected boolean isConfigurationInstalledByRuntime(String configurationPid) {
@@ -780,6 +1025,27 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 				throw new FeatureRuntimeException(
 						String.format("The feature %d has mandatory extensions for which are not understood",
 								unknownMandatoryFeatureExtensions.size()));
+			}
+		}
+
+		protected Map<String, Object> mergeVariables(Feature feature) {
+			Map<String, Object> allVariables = new HashMap<>(feature.getVariables());
+
+			if (!variables.isEmpty()) {
+				allVariables.putAll(variables);
+			}
+
+			ensureVariablesNotNull(allVariables);
+
+			return allVariables;
+		}
+
+		private void ensureVariablesNotNull(Map<String, Object> allVariables) {
+			for (Map.Entry<String, Object> variable : allVariables.entrySet()) {
+				if (variable.getValue() == null) {
+					throw new FeatureRuntimeException(
+							String.format("No value provided for variable %s!", variable.getKey()));
+				}
 			}
 		}
 
@@ -829,97 +1095,31 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 		}
 	}
 
-	private void removeFeature(ID featureId) {
-		// remove only those bundles which are not referenced by other features
-		Deque<ID> bundleIDsForRemoval = getBundleIDsForRemoval(featureId);
+	public class RemoveOperationBuilderImpl extends AbstractOperationBuilderImpl<RemoveOperationBuilder>
+			implements RemoveOperationBuilder {
 
-		stopBundles(bundleIDsForRemoval);
-
-		uninstallBundles(bundleIDsForRemoval);
-
-		// remove only those configurations which are not referenced by other features
-		Set<String> configurationPIDsForRemoval = getConfigurationPIDsForRemoval(featureId);
-
-		removeFeatureConfigurations(configurationPIDsForRemoval);
-
-		// remove feature from list of installed features
-		installedFeatures.removeIf(f -> featureId.equals(f.getFeature().getID()));
-
-		// update "owning features" in other installed features
-		updateInstalledFeaturesOnRemove(featureId);
-	}
-
-	private Deque<ID> getBundleIDsForRemoval(ID featureId) {
-		// Get all the bundles to remove in "install order", clearing the features map
-		Set<ID> bundlesToRemove = installedFeaturesToBundles.remove(featureId).stream()
-				.collect(Collectors.toCollection(LinkedHashSet::new));
-
-		// Create a deque of bundles to remove, in the order they should be removed
-		Deque<ID> orderedBundleIDsForRemoval = new LinkedList<>();
-		for (ID bundleToRemove : bundlesToRemove) {
-			// Only remove the bundle if no remaining features reference it
-			if (installedFeaturesToBundles.values().stream().noneMatch(c -> c.contains(bundleToRemove))) {
-				// Add to the start of the deque, so that we reverse the install order
-				orderedBundleIDsForRemoval.addFirst(bundleToRemove);
-
-				LOG.info(String.format("Bundle %s is no longer required and will be removed", bundleToRemove));
-			}
+		public RemoveOperationBuilderImpl(Feature feature) {
+			super(feature);
 		}
 
-		return orderedBundleIDsForRemoval;
-	}
-
-	private void stopBundles(Deque<ID> bundleIDsToStop) {
-		for (ID bundleIDToStop : bundleIDsToStop) {
-			Bundle bundleForRemoval = installedBundlesByIdentifier.get(bundleIDToStop);
-			if (bundleForRemoval != null) {
-				try {
-					BundleRevision rev = bundleForRemoval.adapt(BundleRevision.class);
-					if (rev != null && (rev.getTypes() & BundleRevision.TYPE_FRAGMENT) == 0) {
-						bundleForRemoval.stop();
-					}
-				} catch (BundleException e) {
-					LOG.warn(String.format("An error occurred stopping bundle %s", bundleIDToStop), e);
-				}
-			}
+		/* 
+		 * (non-Javadoc)
+		 * @see com.kentyou.featurelauncher.impl.runtime.FeatureRuntimeImpl.RemoveOperationBuilder#remove()
+		 */
+		@Override
+		public void remove() {
+			removeFeature(this.feature.getID());
 		}
 	}
 
-	private void uninstallBundles(Deque<ID> bundleIDsToUninstall) {
-		for (ID bundleIDToRemove : bundleIDsToUninstall) {
-			Bundle bundleForRemoval = installedBundlesByIdentifier.remove(bundleIDToRemove);
-			if (bundleForRemoval != null) {
-				try {
-					bundleForRemoval.uninstall();
-				} catch (BundleException e) {
-					LOG.warn(String.format("An error occurred uninstalling bundle %s", bundleIDToRemove), e);
-				}
-			}
-		}
-	}
-
-	private Set<String> getConfigurationPIDsForRemoval(ID featureId) {
-		Set<String> configurationPIDsForRemoval = new HashSet<>();
-
-		if (installedFeaturesToConfigurations.containsKey(featureId)) {
-			Set<String> featureConfigurationPIDsToRemove = installedFeaturesToConfigurations.remove(featureId).stream()
-					.collect(Collectors.toSet());
-
-			for (String featureConfigurationPIDToRemove : featureConfigurationPIDsToRemove) {
-				if (installedFeaturesToConfigurations.values().stream()
-						.noneMatch(c -> c.contains(featureConfigurationPIDToRemove))) {
-					configurationPIDsForRemoval.add(featureConfigurationPIDToRemove);
-
-					LOG.info(String.format("Configuration %s will be removed", featureConfigurationPIDToRemove));
-				}
-			}
-		}
-
-		return configurationPIDsForRemoval;
-	}
-
-	private void removeFeatureConfigurations(Set<String> configurationPIDsForRemoval) {
-		featureRuntimeConfigurationManager.removeConfigurations(configurationPIDsForRemoval);
+	protected InstalledFeature getInstalledFeatureById(ID featureId) {
+		// @formatter:off
+		return installedFeatures.stream()
+				.filter(f -> ((f.isDecorated() && featureId.equals(f.getOriginalFeature().getID())) 
+						|| (!f.isDecorated() && featureId.equals(f.getFeature().getID()))))
+				.findFirst()
+				.orElse(null);
+		// @formatter:on
 	}
 
 	private void updateInstalledFeaturesOnAddOrUpdate(InstalledFeature installedFeature) {
@@ -1005,5 +1205,10 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 
 	private void setExternalFeatureId() {
 		externalFeatureId = featureService.getIDfromMavenCoordinates(FeatureRuntimeConstants.EXTERNAL_FEATURE_ID);
+	}
+
+	// TODO: maybe add this to org.osgi.service.featurelauncher.runtime.FeatureRuntime ?
+	public interface RemoveOperationBuilder extends OperationBuilder<RemoveOperationBuilder> {
+		void remove();
 	}
 }

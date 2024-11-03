@@ -62,7 +62,7 @@ public class LaunchFrameworkFeatureExtensionHandlerImpl implements LaunchFramewo
 	@Override
 	public Optional<FrameworkFactory> selectFrameworkFactory(FeatureExtension featureExtension,
 			List<ArtifactRepository> artifactRepositories, Optional<FrameworkFactory> defaultFrameworkFactoryOptional) {
-		Optional<FrameworkFactory> selectedFrameworkFactoryOptional = Optional.empty();
+		Optional<FrameworkFactory> selectFrameworkFactoryOptional = Optional.empty();
 
 		for (FeatureArtifact featureArtifact : featureExtension.getArtifacts()) {
 			Path artifactPath = getArtifactPath(featureArtifact.getID(), artifactRepositories);
@@ -92,11 +92,11 @@ public class LaunchFrameworkFeatureExtensionHandlerImpl implements LaunchFramewo
 					// @formatter:on
 				}
 
-				selectedFrameworkFactoryOptional = Optional.of(loadedServices.get(0));
+				selectFrameworkFactoryOptional = Optional.of(loadedServices.get(0));
 
-				if (selectedFrameworkFactoryOptional.isPresent()) {
+				if (selectFrameworkFactoryOptional.isPresent()) {
 					LOG.info(String.format("Selected '%s' OSGi framework implementation",
-							selectedFrameworkFactoryOptional.get()));
+							selectFrameworkFactoryOptional.get()));
 					Thread.currentThread().setContextClassLoader(urlClassLoader);
 					break;
 				} else {
@@ -107,7 +107,7 @@ public class LaunchFrameworkFeatureExtensionHandlerImpl implements LaunchFramewo
 			}
 		}
 
-		return selectedFrameworkFactoryOptional;
+		return selectFrameworkFactoryOptional;
 	}
 
 	private Path getArtifactPath(ID artifactId, List<ArtifactRepository> artifactRepositories) {

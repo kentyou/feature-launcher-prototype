@@ -19,7 +19,10 @@ import static com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryCons
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.osgi.service.featurelauncher.FeatureLauncherConstants.*;
+import static org.osgi.framework.Constants.FRAMEWORK_BEGINNING_STARTLEVEL;
+import static org.osgi.service.featurelauncher.FeatureLauncherConstants.BUNDLE_START_LEVELS;
+import static org.osgi.service.featurelauncher.FeatureLauncherConstants.CONFIGURATION_TIMEOUT;
+import static org.osgi.service.featurelauncher.FeatureLauncherConstants.FRAMEWORK_LAUNCHING_PROPERTIES;
 import static org.osgi.service.featurelauncher.repository.ArtifactRepositoryConstants.ARTIFACT_REPOSITORY_NAME;
 
 import java.io.IOException;
@@ -27,11 +30,11 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.io.TempDir;
@@ -46,7 +49,7 @@ import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 import com.kentyou.featurelauncher.impl.decorator.BundleStartLevelsFeatureExtensionHandler;
 import com.kentyou.featurelauncher.impl.decorator.FrameworkLaunchingPropertiesFeatureExtensionHandler;
 import com.kentyou.featurelauncher.impl.util.BundleStateUtil;
-import com.kentyou.featurelauncher.impl.util.FeatureDecorationUtil;
+import com.kentyou.featurelauncher.impl.util.DecorationUtil;
 import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
 
 /**
@@ -61,6 +64,8 @@ public class FeatureLauncherImplTest {
 	FeatureLauncher featureLauncher;
 	Path localM2RepositoryPath;
 	Map<String, String> frameworkProperties;
+	ArtifactRepository localArtifactRepository;
+	ArtifactRepository remoteRepository;
 
 	@TempDir
 	Path frameworkStorageTempDir;
@@ -79,6 +84,16 @@ public class FeatureLauncherImplTest {
 
 		// Load the Feature Launcher
 		featureLauncher = ServiceLoaderUtil.loadFeatureLauncherService();
+		assertNotNull(featureLauncher);
+
+		// Set up a repositories
+		localArtifactRepository = featureLauncher.createRepository(localM2RepositoryPath);
+		assertNotNull(localArtifactRepository);
+
+		remoteRepository = featureLauncher.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
+				Map.of(ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME,
+						LOCAL_ARTIFACT_REPOSITORY_PATH, localM2RepositoryPath.toString()));
+		assertNotNull(remoteRepository);
 	}
 
 	// The use of Gogo Shell requires that Std In is connected to a live
@@ -95,18 +110,9 @@ public class FeatureLauncherImplTest {
 		System.clearProperty("gosh.args");
 	}
 
-//	@Disabled
 	@Test
 	public void testLaunchFeatureWithNoConfigWithDefaultFramework()
 			throws IOException, InterruptedException, URISyntaxException, BundleException {
-		// Set up a repositories
-		ArtifactRepository localArtifactRepository = featureLauncher.createRepository(localM2RepositoryPath);
-		assertNotNull(localArtifactRepository);
-
-		ArtifactRepository remoteRepository = featureLauncher.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
-				Map.of(ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME,
-						LOCAL_ARTIFACT_REPOSITORY_PATH, localM2RepositoryPath.toString()));
-		assertNotNull(remoteRepository);
 
 		// Read Feature JSON
 		Path featureJSONPath = Paths.get(getClass().getResource("/features/gogo-console-feature.json").toURI());
@@ -138,20 +144,9 @@ public class FeatureLauncherImplTest {
 		osgiFramework.waitForStop(0);
 	}
 
-//	@Disabled
 	@Test
 	public void testLaunchFeatureWithConfigWithDefaultFramework()
 			throws IOException, InterruptedException, URISyntaxException, BundleException {
-		// Set up a repositories
-		ArtifactRepository localArtifactRepository = featureLauncher.createRepository(localM2RepositoryPath);
-		assertNotNull(localArtifactRepository);
-
-		ArtifactRepository remoteRepository = featureLauncher.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
-				Map.of(ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME,
-						LOCAL_ARTIFACT_REPOSITORY_PATH, localM2RepositoryPath.toString()));
-		assertNotNull(remoteRepository);
-
-		// console-webconsole-feature.unit-tests.json
 
 		// Read Feature JSON
 		Path featureJSONPath = Paths
@@ -193,18 +188,99 @@ public class FeatureLauncherImplTest {
 		osgiFramework.waitForStop(0);
 	}
 
-//	@Disabled
+	@Test
+	public void testLaunchFeatureWithConfigBeforeBundlesStartWithDefaultFramework()
+			throws IOException, InterruptedException, URISyntaxException, BundleException {
+
+		// Read Feature JSON
+		Path featureJSONPath = Paths
+				.get(getClass().getResource("/features/console-webconsole-feature.unit-tests.json").toURI());
+
+		// Launch the framework
+		// @formatter:off
+		Framework osgiFramework = featureLauncher.launch(Files.newBufferedReader(featureJSONPath))
+				.withRepository(localArtifactRepository)
+				.withRepository(remoteRepository)
+				.withFrameworkProperties(frameworkProperties)
+				.withConfiguration(Map.of(CONFIGURATION_TIMEOUT, 0))
+				.launchFramework();
+		// @formatter:on
+
+		// Verify bundles defined in feature are installed and started
+		Bundle[] bundles = osgiFramework.getBundleContext().getBundles();
+		assertEquals(15, bundles.length);
+
+		assertEquals("org.apache.felix.configadmin", bundles[1].getSymbolicName());
+		assertEquals("ACTIVE", BundleStateUtil.getBundleStateString(bundles[1].getState()));
+
+		assertEquals("org.apache.felix.gogo.command", bundles[2].getSymbolicName());
+		assertEquals("ACTIVE", BundleStateUtil.getBundleStateString(bundles[2].getState()));
+
+		assertEquals("org.apache.felix.gogo.shell", bundles[3].getSymbolicName());
+		assertEquals("ACTIVE", BundleStateUtil.getBundleStateString(bundles[3].getState()));
+
+		assertEquals("org.apache.felix.gogo.runtime", bundles[4].getSymbolicName());
+		assertEquals("ACTIVE", BundleStateUtil.getBundleStateString(bundles[4].getState()));
+
+		assertEquals("biz.aQute.gogo.commands.provider", bundles[5].getSymbolicName());
+		assertEquals("ACTIVE", BundleStateUtil.getBundleStateString(bundles[5].getState()));
+
+		assertEquals("org.apache.felix.webconsole", bundles[14].getSymbolicName());
+		assertEquals("ACTIVE", BundleStateUtil.getBundleStateString(bundles[14].getState()));
+
+		// Stop framework
+		osgiFramework.stop();
+		osgiFramework.waitForStop(0);
+	}
+
+	@Test
+	public void testLaunchFeatureWithConfigNoWaitWWithDefaultFramework()
+			throws IOException, InterruptedException, URISyntaxException, BundleException {
+
+		// Read Feature JSON
+		Path featureJSONPath = Paths
+				.get(getClass().getResource("/features/console-webconsole-feature.unit-tests.json").toURI());
+
+		// Launch the framework
+		// @formatter:off
+		Framework osgiFramework = featureLauncher.launch(Files.newBufferedReader(featureJSONPath))
+				.withRepository(localArtifactRepository)
+				.withRepository(remoteRepository)
+				.withFrameworkProperties(frameworkProperties)
+				.withConfiguration(Map.of(CONFIGURATION_TIMEOUT, -1))
+				.launchFramework();
+		// @formatter:on
+
+		// Verify bundles defined in feature are installed and started
+		Bundle[] bundles = osgiFramework.getBundleContext().getBundles();
+		assertEquals(15, bundles.length);
+
+		assertEquals("org.apache.felix.configadmin", bundles[1].getSymbolicName());
+		assertEquals("ACTIVE", BundleStateUtil.getBundleStateString(bundles[1].getState()));
+
+		assertEquals("org.apache.felix.gogo.command", bundles[2].getSymbolicName());
+		assertEquals("ACTIVE", BundleStateUtil.getBundleStateString(bundles[2].getState()));
+
+		assertEquals("org.apache.felix.gogo.shell", bundles[3].getSymbolicName());
+		assertEquals("ACTIVE", BundleStateUtil.getBundleStateString(bundles[3].getState()));
+
+		assertEquals("org.apache.felix.gogo.runtime", bundles[4].getSymbolicName());
+		assertEquals("ACTIVE", BundleStateUtil.getBundleStateString(bundles[4].getState()));
+
+		assertEquals("biz.aQute.gogo.commands.provider", bundles[5].getSymbolicName());
+		assertEquals("ACTIVE", BundleStateUtil.getBundleStateString(bundles[5].getState()));
+
+		assertEquals("org.apache.felix.webconsole", bundles[14].getSymbolicName());
+		assertEquals("ACTIVE", BundleStateUtil.getBundleStateString(bundles[14].getState()));
+
+		// Stop framework
+		osgiFramework.stop();
+		osgiFramework.waitForStop(0);
+	}
+
 	@Test
 	public void testLaunchFeatureWithLaunchFrameworkExtension()
 			throws IOException, InterruptedException, URISyntaxException, BundleException {
-		// Set up a repositories
-		ArtifactRepository localArtifactRepository = featureLauncher.createRepository(localM2RepositoryPath);
-		assertNotNull(localArtifactRepository);
-
-		ArtifactRepository remoteRepository = featureLauncher.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
-				Map.of(ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME,
-						LOCAL_ARTIFACT_REPOSITORY_PATH, localM2RepositoryPath.toString()));
-		assertNotNull(remoteRepository);
 
 		// Read Feature JSON
 		Path featureJSONPath = Paths
@@ -237,18 +313,9 @@ public class FeatureLauncherImplTest {
 		osgiFramework.waitForStop(0);
 	}
 
-//	@Disabled
 	@Test
 	public void testLaunchFeatureWithNonMandatoryLaunchFrameworkExtension()
 			throws IOException, InterruptedException, URISyntaxException, BundleException {
-		// Set up a repositories
-		ArtifactRepository localArtifactRepository = featureLauncher.createRepository(localM2RepositoryPath);
-		assertNotNull(localArtifactRepository);
-
-		ArtifactRepository remoteRepository = featureLauncher.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
-				Map.of(ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME,
-						LOCAL_ARTIFACT_REPOSITORY_PATH, localM2RepositoryPath.toString()));
-		assertNotNull(remoteRepository);
 
 		// Read Feature JSON
 		Path featureJSONPath = Paths.get(getClass()
@@ -281,18 +348,9 @@ public class FeatureLauncherImplTest {
 		osgiFramework.waitForStop(0);
 	}
 
-//	@Disabled
 	@Test
 	public void testLaunchFeatureWithNonFrameworkLaunchFrameworkExtension()
 			throws IOException, InterruptedException, URISyntaxException, BundleException {
-		// Set up a repositories
-		ArtifactRepository localArtifactRepository = featureLauncher.createRepository(localM2RepositoryPath);
-		assertNotNull(localArtifactRepository);
-
-		ArtifactRepository remoteRepository = featureLauncher.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
-				Map.of(ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME,
-						LOCAL_ARTIFACT_REPOSITORY_PATH, localM2RepositoryPath.toString()));
-		assertNotNull(remoteRepository);
 
 		// Read Feature JSON
 		Path featureJSONPath = Paths.get(getClass()
@@ -328,18 +386,10 @@ public class FeatureLauncherImplTest {
 	@Test
 	public void testFrameworkLaunchingPropertiesFeatureExtension()
 			throws IOException, InterruptedException, URISyntaxException, BundleException, AbandonOperationException {
-		// Set up a repositories
-		ArtifactRepository localArtifactRepository = featureLauncher.createRepository(localM2RepositoryPath);
-		assertNotNull(localArtifactRepository);
-
-		ArtifactRepository remoteRepository = featureLauncher.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
-				Map.of(ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME,
-						LOCAL_ARTIFACT_REPOSITORY_PATH, localM2RepositoryPath.toString()));
-		assertNotNull(remoteRepository);
 
 		// Read Feature JSON
-		Path featureJSONPath = Paths.get(getClass()
-				.getResource("/features/gogo-console-framework-launching-properties-extension-feature.json").toURI());
+		Path featureJSONPath = Paths.get(
+				getClass().getResource("/features/test-framework-launching-properties-extension-feature.json").toURI());
 
 		// Launch the framework
 		// @formatter:off
@@ -350,7 +400,7 @@ public class FeatureLauncherImplTest {
 				.launchFramework();
 		// @formatter:on
 
-		FrameworkLaunchingPropertiesFeatureExtensionHandler frameworkLaunchingPropertiesFeatureExtensionHandler = FeatureDecorationUtil
+		FrameworkLaunchingPropertiesFeatureExtensionHandler frameworkLaunchingPropertiesFeatureExtensionHandler = DecorationUtil
 				.getBuiltInHandlerForExtension(FRAMEWORK_LAUNCHING_PROPERTIES);
 
 		// Verify framework properties
@@ -401,18 +451,10 @@ public class FeatureLauncherImplTest {
 	@Test
 	public void testBundleStartLevelsFeatureExtension()
 			throws IOException, InterruptedException, URISyntaxException, BundleException, AbandonOperationException {
-		// Set up a repositories
-		ArtifactRepository localArtifactRepository = featureLauncher.createRepository(localM2RepositoryPath);
-		assertNotNull(localArtifactRepository);
 
-		ArtifactRepository remoteRepository = featureLauncher.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
-				Map.of(ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME,
-						LOCAL_ARTIFACT_REPOSITORY_PATH, localM2RepositoryPath.toString()));
-		assertNotNull(remoteRepository);
-		
 		// Read Feature JSON
-		Path featureJSONPath = Paths
-				.get(getClass().getResource("/features/gogo-console-bundle-start-levels-extension-feature.json").toURI());
+		Path featureJSONPath = Paths.get(
+				getClass().getResource("/features/gogo-console-bundle-start-levels-extension-feature.json").toURI());
 
 		// Launch the framework
 		// @formatter:off
@@ -422,58 +464,54 @@ public class FeatureLauncherImplTest {
 				.withFrameworkProperties(frameworkProperties)
 				.launchFramework();
 		// @formatter:on
-		
-		BundleStartLevelsFeatureExtensionHandler bundleStartLevelsFeatureExtensionHandler = FeatureDecorationUtil
+
+		BundleStartLevelsFeatureExtensionHandler bundleStartLevelsFeatureExtensionHandler = DecorationUtil
 				.getBuiltInHandlerForExtension(BUNDLE_START_LEVELS);
-		
+
 		assertTrue(bundleStartLevelsFeatureExtensionHandler.hasDefaultBundleStartLevel());
 		assertEquals(2, bundleStartLevelsFeatureExtensionHandler.getDefaultBundleStartLevel().intValue());
-		
+
 		assertTrue(bundleStartLevelsFeatureExtensionHandler.hasMinimumFrameworkStartLevel());
 		assertEquals(1, bundleStartLevelsFeatureExtensionHandler.getMinimumFrameworkStartLevel().intValue());
-		
+
 		// Stop framework
 		osgiFramework.stop();
 		osgiFramework.waitForStop(0);
 	}
-	
-	@Disabled // TODO
+
 	@Test
 	public void testLaunchFeatureWithBundleMetadata()
 			throws IOException, InterruptedException, URISyntaxException, BundleException {
-		// Set up a repositories
-		ArtifactRepository localArtifactRepository = featureLauncher.createRepository(localM2RepositoryPath);
-		assertNotNull(localArtifactRepository);
 
-		ArtifactRepository remoteRepository = featureLauncher.createRepository(REMOTE_ARTIFACT_REPOSITORY_URI,
-				Map.of(ARTIFACT_REPOSITORY_NAME, DEFAULT_REMOTE_ARTIFACT_REPOSITORY_NAME,
-						LOCAL_ARTIFACT_REPOSITORY_PATH, localM2RepositoryPath.toString()));
-		assertNotNull(remoteRepository);
+		// Set additional framework properties
+		Map<String, String> extraFrameworkProperties = new HashMap<>(frameworkProperties);
+		extraFrameworkProperties.put(FRAMEWORK_BEGINNING_STARTLEVEL, "2");
 
 		// Read Feature JSON
-		Path featureJSONPath = Paths.get(getClass().getResource("/features/gogo-console-bundle-start-levels-metadata-feature.json").toURI());
+		Path featureJSONPath = Paths.get(
+				getClass().getResource("/features/gogo-console-bundle-start-levels-metadata-feature.json").toURI());
 
 		// Launch the framework
 		// @formatter:off
 		Framework osgiFramework = featureLauncher.launch(Files.newBufferedReader(featureJSONPath))
 				.withRepository(localArtifactRepository)
 				.withRepository(remoteRepository)
-				.withFrameworkProperties(frameworkProperties)
+				.withFrameworkProperties(extraFrameworkProperties)
 				.launchFramework();
 		// @formatter:on
 
 		// Verify bundles defined in feature are installed and started
-//		Bundle[] bundles = osgiFramework.getBundleContext().getBundles();
-//		assertEquals(4, bundles.length);
-//
-//		assertEquals("org.apache.felix.gogo.command", bundles[1].getSymbolicName());
-//		assertEquals("ACTIVE", BundleStateUtil.getBundleStateString(bundles[1].getState()));
-//
-//		assertEquals("org.apache.felix.gogo.shell", bundles[2].getSymbolicName());
-//		assertEquals("ACTIVE", BundleStateUtil.getBundleStateString(bundles[2].getState()));
-//
-//		assertEquals("org.apache.felix.gogo.runtime", bundles[3].getSymbolicName());
-//		assertEquals("ACTIVE", BundleStateUtil.getBundleStateString(bundles[3].getState()));
+		Bundle[] bundles = osgiFramework.getBundleContext().getBundles();
+		assertEquals(4, bundles.length);
+
+		assertEquals("org.apache.felix.gogo.command", bundles[1].getSymbolicName());
+		assertEquals("ACTIVE", BundleStateUtil.getBundleStateString(bundles[1].getState()));
+
+		assertEquals("org.apache.felix.gogo.shell", bundles[2].getSymbolicName());
+		assertEquals("ACTIVE", BundleStateUtil.getBundleStateString(bundles[2].getState()));
+
+		assertEquals("org.apache.felix.gogo.runtime", bundles[3].getSymbolicName());
+		assertEquals("ACTIVE", BundleStateUtil.getBundleStateString(bundles[3].getState()));
 
 		// Stop framework
 		osgiFramework.stop();

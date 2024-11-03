@@ -30,8 +30,6 @@ import org.osgi.service.feature.FeatureService;
 import org.osgi.service.feature.ID;
 import org.osgi.service.featurelauncher.decorator.BaseFeatureDecorationBuilder;
 
-import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
-
 /**
  * Implementation of {@link org.osgi.service.featurelauncher.decorator.BaseFeatureDecorationBuilder<T>}
  * 
@@ -40,8 +38,7 @@ import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
  */
 public abstract class AbstractBaseFeatureDecorationBuilder<T extends BaseFeatureDecorationBuilder<T>>
 		implements BaseFeatureDecorationBuilder<T> {
-	protected static FeatureService featureService = ServiceLoaderUtil.loadFeatureService();
-
+	protected final FeatureService featureService;
 	protected final Feature originalFeature;
 	protected boolean isBuilt;
 	protected List<FeatureBundle> bundles;
@@ -49,9 +46,11 @@ public abstract class AbstractBaseFeatureDecorationBuilder<T extends BaseFeature
 	protected Map<String, Object> variables;
 	protected String classifier;
 
-	public AbstractBaseFeatureDecorationBuilder(Feature feature) {
+	public AbstractBaseFeatureDecorationBuilder(FeatureService featureService, Feature feature) {
+		Objects.requireNonNull(featureService, "Feature Service cannot be null!");
 		Objects.requireNonNull(feature, "Feature cannot be null!");
 
+		this.featureService = featureService;
 		this.originalFeature = feature;
 		this.isBuilt = false;
 		this.bundles = new ArrayList<>();

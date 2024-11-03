@@ -23,7 +23,7 @@ import org.osgi.service.feature.FeatureExtension;
 import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
 import org.osgi.service.featurelauncher.decorator.DecoratorBuilderFactory;
 
-import com.kentyou.featurelauncher.impl.util.FeatureDecorationUtil;
+import com.kentyou.featurelauncher.impl.util.DecorationUtil;
 
 /**
  * Implementation of
@@ -52,11 +52,11 @@ public class BundleStartLevelsFeatureExtensionHandlerImpl implements BundleStart
 			FeatureExtensionHandlerBuilder decoratedFeatureBuilder, DecoratorBuilderFactory factory)
 			throws AbandonOperationException {
 
-		Map<String, String> properties = FeatureDecorationUtil.readFeatureExtensionJSON(extension.getJSON());
+		Map<String, Object> properties = DecorationUtil.readFeatureExtensionJSON(extension.getJSON());
 
 		// The minimum required framework start level after installing this feature
 		if (properties.containsKey(BUNDLE_START_LEVELS_MINIMUM)) {
-			minimumFrameworkStartLevel = Integer.valueOf(properties.get(BUNDLE_START_LEVELS_MINIMUM));
+			minimumFrameworkStartLevel = Integer.valueOf((properties.get(BUNDLE_START_LEVELS_MINIMUM)).toString());
 
 			if (minimumFrameworkStartLevel.intValue() < 1 || minimumFrameworkStartLevel > Integer.MAX_VALUE) {
 				throw new AbandonOperationException(String.format(
@@ -67,7 +67,7 @@ public class BundleStartLevelsFeatureExtensionHandlerImpl implements BundleStart
 
 		// The default start level to use for bundles in this feature
 		if (properties.containsKey(BUNDLE_START_LEVELS_DEFAULT)) {
-			defaultBundleStartLevel = Integer.valueOf(properties.get(BUNDLE_START_LEVELS_DEFAULT));
+			defaultBundleStartLevel = Integer.valueOf((properties.get(BUNDLE_START_LEVELS_DEFAULT)).toString());
 
 			if (defaultBundleStartLevel.intValue() < 1 || defaultBundleStartLevel > Integer.MAX_VALUE) {
 				throw new AbandonOperationException(String.format(

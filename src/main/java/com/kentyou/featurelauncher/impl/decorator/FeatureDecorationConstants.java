@@ -14,7 +14,7 @@
 package com.kentyou.featurelauncher.impl.decorator;
 
 /**
- * TODO: javadoc
+ * Defines additional constants for feature decoration.
  * 
  * @author Michael H. Siemaszko (mhs@into.software)
  * @since Oct 28, 2024

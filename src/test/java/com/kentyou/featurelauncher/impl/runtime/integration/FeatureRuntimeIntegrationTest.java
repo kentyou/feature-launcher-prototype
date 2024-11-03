@@ -42,8 +42,12 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.osgi.framework.ServiceReference;
 import org.osgi.service.cm.Configuration;
 import org.osgi.service.cm.ConfigurationAdmin;
+import org.osgi.service.feature.Feature;
 import org.osgi.service.feature.FeatureService;
 import org.osgi.service.feature.ID;
+import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
+import org.osgi.service.featurelauncher.decorator.DecoratorBuilderFactory;
+import org.osgi.service.featurelauncher.decorator.FeatureDecorator;
 import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 import org.osgi.service.featurelauncher.runtime.FeatureRuntime;
 import org.osgi.service.featurelauncher.runtime.FeatureRuntimeConstants;
@@ -145,6 +149,7 @@ public class FeatureRuntimeIntegrationTest {
 			// @formatter:on
 			assertNotNull(installedFeature);
 			assertFalse(installedFeature.isInitialLaunch());
+			assertFalse(installedFeature.isDecorated());
 
 			assertNotNull(installedFeature.getFeature().getID());
 			assertEquals("com.kentyou.featurelauncher:gogo-console-feature:1.0",
@@ -170,6 +175,72 @@ public class FeatureRuntimeIntegrationTest {
 
 			// Remove feature
 			featureRuntimeService.remove(installedFeature.getFeature().getID());
+
+			// Verify again via installed features
+			installedFeatures = featureRuntimeService.getInstalledFeatures();
+			assertTrue(installedFeatures.isEmpty());
+			assertEquals(0, installedFeatures.size());
+		}
+	}
+
+	@Test
+	public void testInstallFeatureWithNoConfigWithDefaultRepositoriesWithDummyDecorator(
+			@InjectService(cardinality = 1, timeout = 5000) ServiceAware<FeatureRuntime> featureRuntimeServiceAware)
+			throws URISyntaxException, IOException {
+		assertEquals(1, featureRuntimeServiceAware.getServices().size());
+		FeatureRuntime featureRuntimeService = featureRuntimeServiceAware.getService();
+		assertNotNull(featureRuntimeService);
+
+		FeatureDecorator featureDummyDecorator = new FeatureDecorator() {
+
+			@Override
+			public Feature decorate(Feature feature, FeatureDecoratorBuilder decoratedFeatureBuilder,
+					DecoratorBuilderFactory factory) throws AbandonOperationException {
+
+				return decoratedFeatureBuilder.build();
+			}
+		};
+
+		try (InputStream featureIs = getClass().getClassLoader()
+				.getResourceAsStream("/features/gogo-console-feature.json");
+				Reader featureReader = new BufferedReader(
+						new InputStreamReader(featureIs, Charset.forName("UTF-8").newDecoder()));) {
+
+			// Install Feature using default repositories
+			// @formatter:off
+			InstalledFeature installedFeature = featureRuntimeService.install(featureReader)
+					.useDefaultRepositories(true)
+					.withDecorator(featureDummyDecorator)
+					.install();
+			// @formatter:on
+			assertNotNull(installedFeature);
+			assertFalse(installedFeature.isInitialLaunch());
+			assertTrue(installedFeature.isDecorated());
+
+			assertNotNull(installedFeature.getFeature().getID());
+			assertEquals("com.kentyou.featurelauncher:gogo-console-feature:jar:osgi.feature.decorated:1.0",
+					installedFeature.getFeature().getID().toString());
+
+			assertNotNull(installedFeature.getInstalledBundles());
+			List<InstalledBundle> installedBundles = installedFeature.getInstalledBundles();
+			assertEquals(3, installedBundles.size());
+
+			assertEquals("org.apache.felix.gogo.command", installedBundles.get(0).getBundle().getSymbolicName());
+			assertTrue(installedBundles.get(0).getOwningFeatures().contains(installedFeature.getFeature().getID()));
+
+			assertEquals("org.apache.felix.gogo.shell", installedBundles.get(1).getBundle().getSymbolicName());
+			assertTrue(installedBundles.get(1).getOwningFeatures().contains(installedFeature.getFeature().getID()));
+
+			assertEquals("org.apache.felix.gogo.runtime", installedBundles.get(2).getBundle().getSymbolicName());
+			assertTrue(installedBundles.get(2).getOwningFeatures().contains(installedFeature.getFeature().getID()));
+
+			// Verify also via installed features
+			List<InstalledFeature> installedFeatures = featureRuntimeService.getInstalledFeatures();
+			assertFalse(installedFeatures.isEmpty());
+			assertEquals(1, installedFeatures.size());
+
+			// Remove feature
+			featureRuntimeService.remove(installedFeature.getOriginalFeature().getID());
 
 			// Verify again via installed features
 			installedFeatures = featureRuntimeService.getInstalledFeatures();
@@ -211,6 +282,7 @@ public class FeatureRuntimeIntegrationTest {
 			// @formatter:on
 			assertNotNull(installedFeature);
 			assertFalse(installedFeature.isInitialLaunch());
+			assertFalse(installedFeature.isDecorated());
 
 			assertNotNull(installedFeature.getFeature().getID());
 			assertEquals("com.kentyou.featurelauncher:gogo-console-feature:1.0",
@@ -281,6 +353,7 @@ public class FeatureRuntimeIntegrationTest {
 
 			assertNotNull(installedFeature);
 			assertFalse(installedFeature.isInitialLaunch());
+			assertFalse(installedFeature.isDecorated());
 
 			assertNotNull(installedFeature.getFeature().getID());
 			assertEquals("com.kentyou.featurelauncher:console-webconsole-feature:1.0",
@@ -391,6 +464,7 @@ public class FeatureRuntimeIntegrationTest {
 			// @formatter:on
 			assertNotNull(installedFeature);
 			assertFalse(installedFeature.isInitialLaunch());
+			assertFalse(installedFeature.isDecorated());
 
 			assertNotNull(installedFeature.getFeature().getID());
 			assertEquals("com.kentyou.featurelauncher:gogo-console-feature:1.0",
@@ -432,6 +506,7 @@ public class FeatureRuntimeIntegrationTest {
 
 			assertNotNull(updatedFeature);
 			assertFalse(updatedFeature.isInitialLaunch());
+			assertFalse(updatedFeature.isDecorated());
 
 			assertNotNull(updatedFeature.getFeature().getID());
 			assertEquals("com.kentyou.featurelauncher:gogo-console-feature:1.0",
