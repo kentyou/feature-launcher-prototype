@@ -32,6 +32,7 @@ import org.osgi.service.featurelauncher.decorator.FeatureDecorator.FeatureDecora
 public class FeatureDecoratorBuilderImpl extends AbstractBaseFeatureDecorationBuilder<FeatureDecoratorBuilder>
 		implements FeatureDecoratorBuilder {
 	private List<FeatureExtension> extensions;
+	private Feature built;
 
 	public FeatureDecoratorBuilderImpl(FeatureService featureService, Feature feature) {
 		super(featureService, feature);
@@ -70,6 +71,13 @@ public class FeatureDecoratorBuilderImpl extends AbstractBaseFeatureDecorationBu
 			featureBuilder.addExtensions(extensions.toArray(FeatureExtension[]::new));
 		}
 
-		return featureBuilder.build();
+		built = featureBuilder.build();
+		
+		return built;
+	}
+
+	@Override
+	public Feature getBuilt() {
+		return built;
 	}
 }

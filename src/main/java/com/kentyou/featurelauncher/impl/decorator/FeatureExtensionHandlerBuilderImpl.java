@@ -26,10 +26,12 @@ import org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler.Featur
 public class FeatureExtensionHandlerBuilderImpl extends
 		AbstractBaseFeatureDecorationBuilder<FeatureExtensionHandlerBuilder> implements FeatureExtensionHandlerBuilder {
 
+	private Feature built;
+
 	public FeatureExtensionHandlerBuilderImpl(FeatureService featureService, Feature feature) {
 		super(featureService, feature);
 	}
-
+	
 	/* 
 	 * (non-Javadoc)
 	 * @see org.osgi.service.featurelauncher.decorator.BaseFeatureDecorationBuilder#build()
@@ -40,6 +42,11 @@ public class FeatureExtensionHandlerBuilderImpl extends
 
 		this.isBuilt = true;
 
-		return prebuild().build();
+		built = prebuild().build();
+		return built;
+	}
+
+	public Feature getBuilt() {
+		return built;
 	}
 }

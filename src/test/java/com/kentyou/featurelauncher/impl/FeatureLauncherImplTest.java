@@ -20,9 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.osgi.framework.Constants.FRAMEWORK_BEGINNING_STARTLEVEL;
-import static org.osgi.service.featurelauncher.FeatureLauncherConstants.BUNDLE_START_LEVELS;
 import static org.osgi.service.featurelauncher.FeatureLauncherConstants.CONFIGURATION_TIMEOUT;
-import static org.osgi.service.featurelauncher.FeatureLauncherConstants.FRAMEWORK_LAUNCHING_PROPERTIES;
 import static org.osgi.service.featurelauncher.repository.ArtifactRepositoryConstants.ARTIFACT_REPOSITORY_NAME;
 
 import java.io.IOException;
@@ -42,14 +40,12 @@ import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleException;
 import org.osgi.framework.Constants;
 import org.osgi.framework.launch.Framework;
+import org.osgi.framework.startlevel.FrameworkStartLevel;
 import org.osgi.service.featurelauncher.FeatureLauncher;
 import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
 import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 
-import com.kentyou.featurelauncher.impl.decorator.BundleStartLevelsFeatureExtensionHandler;
-import com.kentyou.featurelauncher.impl.decorator.FrameworkLaunchingPropertiesFeatureExtensionHandler;
 import com.kentyou.featurelauncher.impl.util.BundleStateUtil;
-import com.kentyou.featurelauncher.impl.util.DecorationUtil;
 import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
 
 /**
@@ -80,7 +76,8 @@ public class FeatureLauncherImplTest {
 		// Configure framework properties
 		System.out.println(
 				"*** Using " + frameworkStorageTempDir + " for framework storage in test " + info.getDisplayName());
-		frameworkProperties = Map.of(Constants.FRAMEWORK_STORAGE, frameworkStorageTempDir.toString());
+		frameworkProperties = Map.of(Constants.FRAMEWORK_STORAGE, frameworkStorageTempDir.toString(),
+				Constants.FRAMEWORK_STORAGE_CLEAN, Constants.FRAMEWORK_STORAGE_CLEAN_ONFIRSTINIT);
 
 		// Load the Feature Launcher
 		featureLauncher = ServiceLoaderUtil.loadFeatureLauncherService();
@@ -400,48 +397,31 @@ public class FeatureLauncherImplTest {
 				.launchFramework();
 		// @formatter:on
 
-		FrameworkLaunchingPropertiesFeatureExtensionHandler frameworkLaunchingPropertiesFeatureExtensionHandler = DecorationUtil
-				.getBuiltInHandlerForExtension(FRAMEWORK_LAUNCHING_PROPERTIES);
-
 		// Verify framework properties
-		Map<String, String> frameworkProperties = frameworkLaunchingPropertiesFeatureExtensionHandler
-				.getFrameworkProperties();
-		assertTrue(frameworkProperties.containsKey("org.osgi.framework.bootdelegation"));
-		assertEquals("sun.*,com.sun.*", frameworkProperties.get("org.osgi.framework.bootdelegation"));
 		assertNotNull(osgiFramework.getBundleContext().getProperty("org.osgi.framework.bootdelegation"));
 		assertEquals("sun.*,com.sun.*",
 				osgiFramework.getBundleContext().getProperty("org.osgi.framework.bootdelegation"));
 
-		assertTrue(frameworkProperties.containsKey("org.osgi.framework.storage"));
-		assertEquals("/tmp", frameworkProperties.get("org.osgi.framework.storage"));
 		assertNotNull(osgiFramework.getBundleContext().getProperty("org.osgi.framework.storage"));
-		assertEquals("/tmp", osgiFramework.getBundleContext().getProperty("org.osgi.framework.storage"));
+		assertEquals(frameworkProperties.get("org.osgi.framework.storage"), osgiFramework.getBundleContext().getProperty("org.osgi.framework.storage"));
 
-		assertTrue(frameworkProperties.containsKey("org.osgi.framework.storage.clean"));
-		assertEquals("onFirstInit", frameworkProperties.get("org.osgi.framework.storage.clean"));
 		assertNotNull(osgiFramework.getBundleContext().getProperty("org.osgi.framework.storage.clean"));
-		assertEquals("onFirstInit", osgiFramework.getBundleContext().getProperty("org.osgi.framework.storage.clean"));
+		assertEquals(frameworkProperties.get("org.osgi.framework.storage.clean"), osgiFramework.getBundleContext().getProperty("org.osgi.framework.storage.clean"));
 
-		assertTrue(frameworkProperties.containsKey("org.osgi.framework.bsnversion"));
-		assertEquals("multiple", frameworkProperties.get("org.osgi.framework.bsnversion"));
 		assertNotNull(osgiFramework.getBundleContext().getProperty("org.osgi.framework.bsnversion"));
 		assertEquals("multiple", osgiFramework.getBundleContext().getProperty("org.osgi.framework.bsnversion"));
 
-		assertTrue(frameworkProperties.containsKey("felix.log.level"));
-		assertEquals("4", frameworkProperties.get("felix.log.level"));
 		assertNotNull(osgiFramework.getBundleContext().getProperty("felix.log.level"));
 		assertEquals("4", osgiFramework.getBundleContext().getProperty("felix.log.level"));
 
-		assertTrue(frameworkProperties.containsKey("_custom_featurelauncher_launchprop"));
-		assertEquals("test", frameworkProperties.get("_custom_featurelauncher_launchprop"));
 		assertNotNull(osgiFramework.getBundleContext().getProperty("_custom_featurelauncher_launchprop"));
 		assertEquals("test", osgiFramework.getBundleContext().getProperty("_custom_featurelauncher_launchprop"));
 
-		// Verify custom properties
-		Map<String, String> customProperties = frameworkLaunchingPropertiesFeatureExtensionHandler
-				.getCustomProperties();
-		assertTrue(customProperties.containsKey("_osgi_featurelauncher_launchprops_version"));
-		assertEquals("1.0.0", customProperties.get("_osgi_featurelauncher_launchprops_version"));
+		// TODO Verify custom properties when we have a use for them
+//		Map<String, String> customProperties = frameworkLaunchingPropertiesFeatureExtensionHandler
+//				.getCustomProperties();
+//		assertTrue(customProperties.containsKey("_osgi_featurelauncher_launchprops_version"));
+//		assertEquals("1.0.0", customProperties.get("_osgi_featurelauncher_launchprops_version"));
 
 		// Stop framework
 		osgiFramework.stop();
@@ -465,14 +445,9 @@ public class FeatureLauncherImplTest {
 				.launchFramework();
 		// @formatter:on
 
-		BundleStartLevelsFeatureExtensionHandler bundleStartLevelsFeatureExtensionHandler = DecorationUtil
-				.getBuiltInHandlerForExtension(BUNDLE_START_LEVELS);
-
-		assertTrue(bundleStartLevelsFeatureExtensionHandler.hasDefaultBundleStartLevel());
-		assertEquals(2, bundleStartLevelsFeatureExtensionHandler.getDefaultBundleStartLevel().intValue());
-
-		assertTrue(bundleStartLevelsFeatureExtensionHandler.hasMinimumFrameworkStartLevel());
-		assertEquals(1, bundleStartLevelsFeatureExtensionHandler.getMinimumFrameworkStartLevel().intValue());
+		FrameworkStartLevel startLevel = osgiFramework.adapt(FrameworkStartLevel.class);
+		assertEquals(4, startLevel.getInitialBundleStartLevel());
+		assertEquals(7, startLevel.getStartLevel());
 
 		// Stop framework
 		osgiFramework.stop();

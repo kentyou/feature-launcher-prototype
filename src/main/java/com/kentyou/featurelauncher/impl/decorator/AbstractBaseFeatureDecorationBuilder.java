@@ -211,4 +211,6 @@ public abstract class AbstractBaseFeatureDecorationBuilder<T extends BaseFeature
 			throw new IllegalStateException("Feature already built!");
 		}
 	}
+	
+	public abstract Feature getBuilt();
 }

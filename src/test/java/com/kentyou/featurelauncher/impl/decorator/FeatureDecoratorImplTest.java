@@ -53,12 +53,15 @@ import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
 public class FeatureDecoratorImplTest {
 	FeatureService featureService;
 	Feature feature;
+	DecorationUtil util;
 
 	@BeforeEach
 	public void setUp() throws URISyntaxException, IOException {
 		// Load the Feature Service
 		featureService = ServiceLoaderUtil.loadFeatureService();
 		assertNotNull(featureService);
+
+		util = new DecorationUtil();
 
 		// Read feature
 		Path featureJSONPath = Paths.get(getClass().getResource("/features/gogo-console-feature.json").toURI());
@@ -95,7 +98,7 @@ public class FeatureDecoratorImplTest {
 			}
 		};
 
-		Feature decoratedFeature = DecorationUtil.executeFeatureDecorators(featureService, feature,
+		Feature decoratedFeature = util.executeFeatureDecorators(featureService, feature,
 				List.of(featureBundlesDecorator));
 		assertNotNull(decoratedFeature);
 
@@ -131,7 +134,7 @@ public class FeatureDecoratorImplTest {
 			}
 		};
 
-		Feature decoratedFeature = DecorationUtil.executeFeatureDecorators(featureService, feature,
+		Feature decoratedFeature = util.executeFeatureDecorators(featureService, feature,
 				List.of(featureConfigurationsDecorator));
 		assertNotNull(decoratedFeature);
 
@@ -163,7 +166,7 @@ public class FeatureDecoratorImplTest {
 			}
 		};
 
-		Feature decoratedFeature = DecorationUtil.executeFeatureDecorators(featureService, feature,
+		Feature decoratedFeature = util.executeFeatureDecorators(featureService, feature,
 				List.of(featureVariablesDecorator));
 		assertNotNull(decoratedFeature);
 
@@ -195,7 +198,7 @@ public class FeatureDecoratorImplTest {
 			}
 		};
 
-		Feature decoratedFeature = DecorationUtil.executeFeatureDecorators(featureService, feature,
+		Feature decoratedFeature = util.executeFeatureDecorators(featureService, feature,
 				List.of(featureExtensionsDecorator));
 		assertNotNull(decoratedFeature);
 
@@ -229,7 +232,7 @@ public class FeatureDecoratorImplTest {
 			}
 		};
 
-		Feature decoratedFeature = DecorationUtil.executeFeatureDecorators(featureService, feature,
+		Feature decoratedFeature = util.executeFeatureDecorators(featureService, feature,
 				List.of(featureNoOpDecorator));
 		assertNotNull(decoratedFeature);
 
@@ -262,7 +265,7 @@ public class FeatureDecoratorImplTest {
 			}
 		};
 
-		assertThrows(AbandonOperationException.class, () -> DecorationUtil
+		assertThrows(AbandonOperationException.class, () -> util
 				.executeFeatureDecorators(featureService, feature, List.of(featureInvalidDecorator)));
 	}
 }

@@ -15,10 +15,8 @@ package com.kentyou.featurelauncher.impl;
 
 import static com.kentyou.featurelauncher.impl.FeatureLauncherConfigurationManager.CONFIGURATION_TIMEOUT_DEFAULT;
 import static com.kentyou.featurelauncher.impl.FeatureLauncherImplConstants.CONFIGURATION_ADMIN_IMPL_DEFAULT;
-import static org.osgi.service.featurelauncher.FeatureLauncherConstants.BUNDLE_START_LEVELS;
 import static org.osgi.service.featurelauncher.FeatureLauncherConstants.BUNDLE_START_LEVEL_METADATA;
 import static org.osgi.service.featurelauncher.FeatureLauncherConstants.CONFIGURATION_TIMEOUT;
-import static org.osgi.service.featurelauncher.FeatureLauncherConstants.FRAMEWORK_LAUNCHING_PROPERTIES;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -57,8 +55,6 @@ import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.kentyou.featurelauncher.impl.decorator.BundleStartLevelsFeatureExtensionHandler;
-import com.kentyou.featurelauncher.impl.decorator.FrameworkLaunchingPropertiesFeatureExtensionHandler;
 import com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryFactoryImpl;
 import com.kentyou.featurelauncher.impl.util.BundleEventUtil;
 import com.kentyou.featurelauncher.impl.util.DecorationUtil;
@@ -112,6 +108,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 	}
 
 	class LaunchBuilderImpl implements LaunchBuilder {
+		private final DecorationUtil decorationUtil = new DecorationUtil();
 		private Feature feature;
 		private boolean isLaunched;
 		private List<Bundle> installedBundles;
@@ -249,9 +246,9 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			//////////////////////////////////////
 			// 160.4.3.1: Feature Decoration
 			try {
-				feature = DecorationUtil.executeFeatureDecorators(featureService, feature, decorators);
+				feature = decorationUtil.executeFeatureDecorators(featureService, feature, decorators);
 
-				feature = DecorationUtil.executeFeatureExtensionHandlers(featureService, feature, extensionHandlers);
+				feature = decorationUtil.executeFeatureExtensionHandlers(featureService, feature, extensionHandlers);
 			} catch (AbandonOperationException e) {
 				throw new LaunchException("Feature decoration handling failed!", e);
 			}
@@ -259,7 +256,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			/////////////////////////////////////////////////
 			// 160.4.3.2: Locating a framework implementation
 			FrameworkFactory frameworkFactory = FrameworkFactoryLocator.locateFrameworkFactory(feature,
-					artifactRepositories);
+					decorationUtil, artifactRepositories);
 
 			///////////////////////////////////////////
 			// 160.4.3.3: Creating a Framework instance
@@ -283,19 +280,15 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 		}
 
 		private Map<String, String> mergeFrameworkProperties() {
-			Map<String, Object> rawProperties = new HashMap<>(frameworkProps);
+			Map<String, Object> rawProperties = new HashMap<>(decorationUtil.getFrameworkHandler().getFrameworkProperties());
 
-			if (DecorationUtil.hasFrameworkLaunchingPropertiesFeatureExtension(feature.getExtensions())) {
-				try {
-					FrameworkLaunchingPropertiesFeatureExtensionHandler frameworkLaunchingPropertiesFeatureExtensionHandler = DecorationUtil
-							.getBuiltInHandlerForExtension(FRAMEWORK_LAUNCHING_PROPERTIES);
-
-					rawProperties.putAll(frameworkLaunchingPropertiesFeatureExtensionHandler.getFrameworkProperties());
-
-				} catch (AbandonOperationException e) {
-					throw new LaunchException(e.getMessage(), e);
+			frameworkProps.entrySet().forEach(e -> {
+				if(e.getValue() == null) {
+					rawProperties.remove(e.getKey());
+				} else {
+					rawProperties.put(e.getKey(), e.getValue());
 				}
-			}
+			});
 
 			Map<String, Object> properties = VariablesUtil.INSTANCE.maybeSubstituteVariables(rawProperties,
 					mergeVariables());
@@ -340,37 +333,13 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 		}
 
 		private void maybeSetFrameworkStartLevel(Framework framework) {
-			if (DecorationUtil.hasBundleStartLevelsFeatureExtension(feature.getExtensions())) {
-				try {
-					BundleStartLevelsFeatureExtensionHandler bundleStartLevelsFeatureExtensionHandler = DecorationUtil
-							.getBuiltInHandlerForExtension(BUNDLE_START_LEVELS);
-
-					if (bundleStartLevelsFeatureExtensionHandler.hasMinimumFrameworkStartLevel()) {
-						framework.adapt(FrameworkStartLevel.class).setStartLevel(
-								bundleStartLevelsFeatureExtensionHandler.getMinimumFrameworkStartLevel().intValue());
-					}
-
-				} catch (AbandonOperationException e) {
-					throw new LaunchException(e.getMessage(), e);
-				}
-			}
+			decorationUtil.getStartLevelHandler().getMinimumFrameworkStartLevel()
+				.ifPresent(sl -> framework.adapt(FrameworkStartLevel.class).setStartLevel(sl));
 		}
 
 		private void maybeSetInitialBundleStartLevel(Framework framework) {
-			if (DecorationUtil.hasBundleStartLevelsFeatureExtension(feature.getExtensions())) {
-				try {
-					BundleStartLevelsFeatureExtensionHandler bundleStartLevelsFeatureExtensionHandler = DecorationUtil
-							.getBuiltInHandlerForExtension(BUNDLE_START_LEVELS);
-
-					if (bundleStartLevelsFeatureExtensionHandler.hasDefaultBundleStartLevel()) {
-						framework.adapt(FrameworkStartLevel.class).setInitialBundleStartLevel(
-								bundleStartLevelsFeatureExtensionHandler.getDefaultBundleStartLevel().intValue());
-					}
-
-				} catch (AbandonOperationException e) {
-					throw new LaunchException(e.getMessage(), e);
-				}
-			}
+			decorationUtil.getStartLevelHandler().getDefaultBundleStartLevel()
+				.ifPresent(sl -> framework.adapt(FrameworkStartLevel.class).setInitialBundleStartLevel(sl));
 		}
 
 		private void startFramework(Framework framework) {

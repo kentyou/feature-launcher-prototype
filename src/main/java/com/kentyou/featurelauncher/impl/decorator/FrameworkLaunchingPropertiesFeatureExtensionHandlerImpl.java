@@ -20,6 +20,7 @@ import org.osgi.service.feature.Feature;
 import org.osgi.service.feature.FeatureExtension;
 import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
 import org.osgi.service.featurelauncher.decorator.DecoratorBuilderFactory;
+import org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler;
 
 import com.kentyou.featurelauncher.impl.util.DecorationUtil;
 import com.kentyou.featurelauncher.impl.util.VariablesUtil;
@@ -31,7 +32,7 @@ import com.kentyou.featurelauncher.impl.util.VariablesUtil;
  * @since Oct 19, 2024
  */
 public class FrameworkLaunchingPropertiesFeatureExtensionHandlerImpl
-		implements FrameworkLaunchingPropertiesFeatureExtensionHandler {
+		implements FeatureExtensionHandler {
 	private final Map<String, String> frameworkProperties;
 
 	private final Map<String, String> customProperties; // properties starting with a single underscore
@@ -71,20 +72,10 @@ public class FrameworkLaunchingPropertiesFeatureExtensionHandlerImpl
 		return feature;
 	}
 
-	/* 
-	 * (non-Javadoc)
-	 * @see com.kentyou.featurelauncher.impl.decorator.FrameworkLaunchingPropertiesFeatureExtensionHandler#getFrameworkProperties()
-	 */
-	@Override
 	public Map<String, String> getFrameworkProperties() {
 		return frameworkProperties;
 	}
 
-	/* 
-	 * (non-Javadoc)
-	 * @see com.kentyou.featurelauncher.impl.decorator.FrameworkLaunchingPropertiesFeatureExtensionHandler#getCustomProperties()
-	 */
-	@Override
 	public Map<String, String> getCustomProperties() {
 		return customProperties;
 	}

@@ -27,13 +27,16 @@ import org.osgi.service.feature.Feature;
 import org.osgi.service.feature.FeatureArtifact;
 import org.osgi.service.feature.FeatureExtension;
 import org.osgi.service.feature.ID;
+import org.osgi.service.featurelauncher.LaunchException;
 import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
 import org.osgi.service.featurelauncher.decorator.DecoratorBuilderFactory;
+import org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler;
 import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.kentyou.featurelauncher.impl.repository.FileSystemArtifactRepository;
+import com.kentyou.featurelauncher.impl.util.DecorationUtil;
 
 /**
  * Implementation of {@link com.kentyou.featurelauncher.impl.decorator.LaunchFrameworkFeatureExtensionHandler}
@@ -41,7 +44,7 @@ import com.kentyou.featurelauncher.impl.repository.FileSystemArtifactRepository;
  * @author Michael H. Siemaszko (mhs@into.software)
  * @since Sep 15, 2024
  */
-public class LaunchFrameworkFeatureExtensionHandlerImpl implements LaunchFrameworkFeatureExtensionHandler {
+public class LaunchFrameworkFeatureExtensionHandlerImpl implements FeatureExtensionHandler {
 	private static final Logger LOG = LoggerFactory.getLogger(LaunchFrameworkFeatureExtensionHandlerImpl.class);
 
 	/* 
@@ -55,15 +58,14 @@ public class LaunchFrameworkFeatureExtensionHandlerImpl implements LaunchFramewo
 		return feature;
 	}
 
-	/* 
-	 * (non-Javadoc)
-	 * @see com.kentyou.featurelauncher.impl.decorator.LaunchFrameworkFeatureExtensionHandler#selectFrameworkFactory(org.osgi.service.feature.FeatureExtension, java.util.List, java.util.Optional)
-	 */
-	@Override
 	public Optional<FrameworkFactory> selectFrameworkFactory(FeatureExtension featureExtension,
 			List<ArtifactRepository> artifactRepositories, Optional<FrameworkFactory> defaultFrameworkFactoryOptional) {
 		Optional<FrameworkFactory> selectFrameworkFactoryOptional = Optional.empty();
 
+		if(featureExtension == null) {
+			return selectFrameworkFactoryOptional;
+		}
+		
 		for (FeatureArtifact featureArtifact : featureExtension.getArtifacts()) {
 			Path artifactPath = getArtifactPath(featureArtifact.getID(), artifactRepositories);
 
@@ -105,6 +107,10 @@ public class LaunchFrameworkFeatureExtensionHandlerImpl implements LaunchFramewo
 			} catch (Throwable t) {
 				LOG.warn(String.format("'%s' is not an OSGi framework implementation!", featureArtifact.getID()), t);
 			}
+		}
+		
+		if(selectFrameworkFactoryOptional.isEmpty() && DecorationUtil.isExtensionMandatory(featureExtension)) {
+			throw new LaunchException("No suitable OSGi framework implementation could be selected!");
 		}
 
 		return selectFrameworkFactoryOptional;
