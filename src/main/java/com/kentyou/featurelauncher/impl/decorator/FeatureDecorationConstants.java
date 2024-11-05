@@ -11,16 +11,18 @@
  * Contributors:
  *     Kentyou - initial implementation
  */
-package com.kentyou.featurelauncher.impl;
+package com.kentyou.featurelauncher.impl.decorator;
 
 /**
- * Additional constants, supplementing those defined in
- * {@link org.osgi.service.featurelauncher.FeatureLauncherConstants} and
- * {@link org.osgi.service.featurelauncher.runtime.FeatureRuntimeConstants}
+ * TODO: javadoc
  * 
  * @author Michael H. Siemaszko (mhs@into.software)
- * @since Oct 3, 2024
+ * @since Oct 28, 2024
  */
-public interface FeatureLauncherImplConstants {
-	String FRAMEWORK_STORAGE_CLEAN_TESTONLY = "testOnly";
+public interface FeatureDecorationConstants {
+	String DEFAULT_DECORATED_TYPE = "jar";
+
+	String BUNDLE_START_LEVELS_DEFAULT = "defaultStartLevel";
+
+	String BUNDLE_START_LEVELS_MINIMUM = "minimumStartLevel";
 }

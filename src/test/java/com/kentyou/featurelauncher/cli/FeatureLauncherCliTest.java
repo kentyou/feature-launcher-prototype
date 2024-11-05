@@ -52,9 +52,9 @@ import picocli.CommandLine;
  */
 public class FeatureLauncherCliTest {
 	private static final String FEATURE_FILE_ID = "com.kentyou.featurelauncher:gogo-console-feature:1.0";
-	private static final String DECORATOR_CLASS_NAME = "com.kentyou.featurelauncher.impl.decorator.FeatureDecoratorImpl";
-	private static final String EXTENSION_HANDLER_NAME = "LaunchFrameworkFeatureExtensionHandler";
-	private static final String EXTENSION_HANDLER_CLASS_NAME = "com.kentyou.featurelauncher.impl.decorator.LaunchFrameworkFeatureExtensionHandlerImpl";
+	private static final String DECORATOR_CLASS_NAME = "com.kentyou.featurelauncher.cli.NoOpFeatureDecorator";
+	private static final String EXTENSION_HANDLER_NAME = "NoOpFeatureExtensionHandler";
+	private static final String EXTENSION_HANDLER_CLASS_NAME = "com.kentyou.featurelauncher.cli.NoOpFeatureExtensionHandler";
 	private static final String LAUNCH_PROPERTY_1_KEY = "key1";
 	private static final String LAUNCH_PROPERTY_1_VALUE = "value1";
 	private static final String LAUNCH_PROPERTY_2_KEY = "key2";

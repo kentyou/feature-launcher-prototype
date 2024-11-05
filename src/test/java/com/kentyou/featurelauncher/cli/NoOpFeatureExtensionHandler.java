@@ -11,7 +11,7 @@
  * Contributors:
  *     Kentyou - initial implementation
  */
-package com.kentyou.featurelauncher.impl.decorator;
+package com.kentyou.featurelauncher.cli;
 
 import org.osgi.service.feature.Feature;
 import org.osgi.service.feature.FeatureExtension;
@@ -19,13 +19,7 @@ import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
 import org.osgi.service.featurelauncher.decorator.DecoratorBuilderFactory;
 import org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler;
 
-/**
- * TODO
- * 
- * @author Michael H. Siemaszko (mhs@into.software)
- * @since Sep 15, 2024
- */
-class FeatureExtensionHandlerImpl implements FeatureExtensionHandler {
+public class NoOpFeatureExtensionHandler implements FeatureExtensionHandler {
 
 	/* 
 	 * (non-Javadoc)
@@ -35,8 +29,6 @@ class FeatureExtensionHandlerImpl implements FeatureExtensionHandler {
 	public Feature handle(Feature feature, FeatureExtension extension,
 			FeatureExtensionHandlerBuilder decoratedFeatureBuilder, DecoratorBuilderFactory factory)
 			throws AbandonOperationException {
-		// TODO Auto-generated method stub
-		return null;
+		return feature;
 	}
-
 }

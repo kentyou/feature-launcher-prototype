@@ -57,6 +57,7 @@
 		<maven.resolver.version>2.0.1</maven.resolver.version>
 		<slf4j.version>2.0.11</slf4j.version>
 		<picocli.version>4.7.6</picocli.version>
+		<commons-text.version>1.12.0</commons-text.version>
 
 		<!-- default OSGi implementations' versions' -->
 		<felix.framework.version>7.0.5</felix.framework.version>
@@ -189,6 +190,11 @@
 			<groupId>info.picocli</groupId>
 			<artifactId>picocli</artifactId>
 			<version>${picocli.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-text</artifactId>
+			<version>${commons-text.version}</version>
 		</dependency>
 
 		<!-- default OSGi framework -->

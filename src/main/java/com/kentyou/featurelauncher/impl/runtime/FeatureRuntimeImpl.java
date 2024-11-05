@@ -20,6 +20,7 @@ import java.io.InputStream;
 import java.io.Reader;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
@@ -49,7 +50,6 @@ import org.osgi.service.feature.FeatureBundle;
 import org.osgi.service.feature.FeatureConfiguration;
 import org.osgi.service.feature.FeatureService;
 import org.osgi.service.feature.ID;
-import org.osgi.service.featurelauncher.LaunchException;
 import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
 import org.osgi.service.featurelauncher.decorator.FeatureDecorator;
 import org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler;
@@ -65,13 +65,10 @@ import org.osgi.service.featurelauncher.runtime.RuntimeConfigurationMerge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.kentyou.featurelauncher.impl.decorator.DecoratorBuilderFactoryImpl;
-import com.kentyou.featurelauncher.impl.decorator.FeatureDecoratorBuilderImpl;
 import com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryFactoryImpl;
 import com.kentyou.featurelauncher.impl.repository.FileSystemArtifactRepository;
 import com.kentyou.featurelauncher.impl.util.ArtifactRepositoryUtil;
-import com.kentyou.featurelauncher.impl.util.FeatureDecoratorUtil;
-import com.kentyou.featurelauncher.impl.util.FeatureExtensionUtil;
+import com.kentyou.featurelauncher.impl.util.FeatureDecorationUtil;
 
 /**
  * 160.5 The Feature Runtime Service
@@ -108,8 +105,11 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 	// List of installed features
 	private final List<InstalledFeature> installedFeatures;
 
-	// List of symbolic names of bundles already present in running framework
-	private final List<String> existingBundlesSymbolicNames;
+	// Bundles already present in running framework
+	private final Map<Map.Entry<String, String>, Long> existingBundles;
+
+	// Allows faster lookup of bundle symbolic name and version
+	private final Map<ID, Map.Entry<String, String>> bundleIdsToSymbolicNamesVersions;
 
 	// ID of the virtual external feature representing ownership of a bundle or
 	// configuration that was deployed by another management agent
@@ -127,9 +127,6 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 			this.defaultArtifactRepositories = ArtifactRepositoryUtil.getDefaultArtifactRepositories(this,
 					defaultM2RepositoryPath);
 
-			// collect symbolic names of bundles already present in running framework
-			this.existingBundlesSymbolicNames = getExistingBundlesSymbolicNames();
-
 		} catch (IOException e) {
 			throw new FeatureRuntimeException("Could not create default artifact repositories!");
 		}
@@ -138,6 +135,11 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 		this.installedFeaturesToBundles = new HashMap<>();
 		this.installedFeaturesToConfigurations = new HashMap<>();
 		this.installedFeatures = new ArrayList<>();
+		this.bundleIdsToSymbolicNamesVersions = new HashMap<>();
+
+		// collect symbolic names and versions of bundles already present in running
+		// framework
+		this.existingBundles = getExistingBundles();
 
 		LOG.info("Started FeatureRuntime!");
 	}
@@ -182,7 +184,6 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 			return install(feature);
 
 		} catch (IOException e) {
-			LOG.error("Error reading feature!", e);
 			throw new FeatureRuntimeException("Error reading feature!", e);
 		}
 	}
@@ -232,13 +233,11 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 			return update(featureId, feature);
 
 		} catch (IOException e) {
-			LOG.error("Error reading feature!", e);
 			throw new FeatureRuntimeException("Error reading feature!", e);
 		}
 	}
 
 	abstract class AbstractOperationBuilderImpl<T extends OperationBuilder<T>> implements OperationBuilder<T> {
-		private final Feature originalFeature;
 		private Feature feature;
 		private boolean isCompleted;
 		private boolean useDefaultRepositories;
@@ -252,7 +251,6 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 		public AbstractOperationBuilderImpl(Feature feature) {
 			Objects.requireNonNull(feature, "Feature cannot be null!");
 
-			this.originalFeature = feature;
 			this.feature = feature;
 			this.isCompleted = false;
 			this.useDefaultRepositories = true;
@@ -375,9 +373,8 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 		public InstalledFeature complete() throws FeatureRuntimeException {
 			this.isCompleted = true;
 
-			if(this.useDefaultRepositories) {
-				getDefaultRepositories().forEach(
-						(k,v) -> this.artifactRepositories.putIfAbsent(k, v));
+			if (this.useDefaultRepositories) {
+				getDefaultRepositories().forEach((k, v) -> this.artifactRepositories.putIfAbsent(k, v));
 			}
 
 			return addOrUpdateFeature(feature);
@@ -413,9 +410,13 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 			}
 
 			// Feature Decoration
-			feature = FeatureDecoratorUtil.executeFeatureDecorators(feature, decorators);
+			try {
+				feature = FeatureDecorationUtil.executeFeatureDecorators(feature, decorators);
 
-			feature = FeatureExtensionUtil.executeFeatureExtensionHandlers(feature, extensionHandlers);
+				feature = FeatureDecorationUtil.executeFeatureExtensionHandlers(feature, extensionHandlers);
+			} catch (AbandonOperationException e) {
+				throw new FeatureRuntimeException("Feature decoration handling failed!", e);
+			}
 
 			// Install bundles
 			List<InstalledBundle> installedBundles = installBundles(feature, featureBundles);
@@ -440,30 +441,16 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 			return installedFeature;
 		}
 
-		protected Feature maybeExecuteFeatureDecorators(Feature feature) {
-			if (!decorators.isEmpty()) {
-				for (FeatureDecorator decorator : decorators) {
-					try {
-						feature = decorator.decorate(feature, new FeatureDecoratorBuilderImpl(feature),
-								new DecoratorBuilderFactoryImpl());
-					} catch (AbandonOperationException e) {
-						throw new LaunchException("Feature Decoration handling failed!", e);
-					}
-				}
-			}
-
-			return feature;
-		}
-
 		protected List<InstalledBundle> installBundles(Feature feature, List<ID> featureBundles) {
 			List<InstalledBundle> installedBundles = new ArrayList<>();
 			for (FeatureBundle featureBundle : feature.getBundles()) {
 				ID bundleId = featureBundle.getID();
 
-				boolean bundleAlreadyPresentInRunningFramework = duplicatesExistingBundle(bundleId);
 				boolean bundleAlreadyInstalledByRuntime = installedBundlesByIdentifier.containsKey(bundleId);
 
-				if (!bundleAlreadyPresentInRunningFramework && !bundleAlreadyInstalledByRuntime) {
+				boolean bundleAlreadyPresentInRunningFramework = duplicatesExistingBundle(bundleId);
+
+				if (!bundleAlreadyInstalledByRuntime && !bundleAlreadyPresentInRunningFramework) {
 					Bundle bundle = installBundle(bundleId);
 					if (bundle != null) {
 						installedBundlesByIdentifier.put(bundleId, bundle);
@@ -472,17 +459,17 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 								constructInstalledBundle(bundleId, bundle, constructOwningFeatures(feature.getID())));
 					}
 				} else {
-					if (bundleAlreadyPresentInRunningFramework) {
+					if (bundleAlreadyInstalledByRuntime) {
+						LOG.info(String.format("Bundle %s duplicates bundle already installed by feature runtime!",
+								bundleId));
+
+						installedBundles.add(constructAlreadyInstalledBundle(feature.getID(), bundleId));
+					} else if (bundleAlreadyPresentInRunningFramework) {
 						LOG.info(String.format("Bundle %s duplicates bundle already present in running framework!",
 								bundleId));
 
 						installedBundles.add(constructExternallyInstalledBundle(feature.getID(), bundleId));
 
-					} else if (bundleAlreadyInstalledByRuntime) {
-						LOG.info(String.format("Bundle %s duplicates bundle already installed by feature runtime!",
-								bundleId));
-
-						installedBundles.add(constructAlreadyInstalledBundle(feature.getID(), bundleId));
 					}
 				}
 			}
@@ -614,8 +601,14 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 		}
 
 		protected InstalledBundle constructExternallyInstalledBundle(ID featureId, ID bundleId) {
-			return constructInstalledBundle(bundleId, null, // bundle was externally installed
-					constructOwningFeatures(featureId, externalFeatureId));
+			Bundle bundle = null;
+
+			Map.Entry<String, String> bundleSymbolicNameAndVersion = getBundleSymbolicNameAndVersion(bundleId);
+			if ((bundleSymbolicNameAndVersion != null) && (existingBundles.containsKey(bundleSymbolicNameAndVersion))) {
+				bundle = bundleContext.getBundle(existingBundles.get(bundleSymbolicNameAndVersion).longValue());
+			}
+
+			return constructInstalledBundle(bundleId, bundle, constructOwningFeatures(featureId, externalFeatureId));
 		}
 
 		protected List<ID> constructOwningFeatures(ID... featureIds) {
@@ -674,27 +667,72 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 			// @formatter:on
 		}
 
-		protected boolean duplicatesExistingBundle(ID featureBundleID) {
-			Path featureBundlePath = getArtifactPath(featureBundleID);
-			if (featureBundlePath != null) {
-				try {
-					JarFile featureBundleJarFile = new JarFile(featureBundlePath.toFile());
+		protected Map.Entry<String, String> getBundleSymbolicNameAndVersion(ID featureBundleID) {
+			if (bundleIdsToSymbolicNamesVersions.containsKey(featureBundleID)) {
+				return bundleIdsToSymbolicNamesVersions.get(featureBundleID);
+			} else {
+				Path featureBundlePath = getArtifactPath(featureBundleID);
+				if (featureBundlePath != null) {
+					try {
+						JarFile featureBundleJarFile = new JarFile(featureBundlePath.toFile());
+						Manifest featureBundleJarMf = featureBundleJarFile.getManifest();
+						if ((featureBundleJarMf != null) && (featureBundleJarMf.getMainAttributes() != null)) {
+							String featureBundleSymbolicName = featureBundleJarMf.getMainAttributes()
+									.getValue("Bundle-SymbolicName");
+							String featureBundleVersion = featureBundleJarMf.getMainAttributes()
+									.getValue("Bundle-Version");
 
-					Manifest featureBundleJarMf = featureBundleJarFile.getManifest();
+							if ((featureBundleSymbolicName != null) && (featureBundleVersion != null)) {
+								Map.Entry<String, String> bundleSymbolicNameAndVersion = Map
+										.entry(featureBundleSymbolicName, featureBundleVersion);
 
-					if ((featureBundleJarMf != null) && (featureBundleJarMf.getMainAttributes() != null)) {
-						// TODO: take into account bundle version as well, if different versions of same
-						// bundle should be supported
-						String featureBundleSymbolicName = featureBundleJarMf.getMainAttributes()
-								.getValue("Bundle-SymbolicName");
-						if (featureBundleSymbolicName != null) {
-							return existingBundlesSymbolicNames.contains(featureBundleSymbolicName);
+								bundleIdsToSymbolicNamesVersions.put(featureBundleID, bundleSymbolicNameAndVersion);
+
+								return bundleSymbolicNameAndVersion;
+							}
 						}
+					} catch (IOException e) {
+						LOG.error(
+								String.format("Error getting symbolic name and version for bundle %s", featureBundleID),
+								e);
 					}
+				}
+			}
 
-				} catch (IOException e) {
-					LOG.error(String.format("Error checking for if bundle %s duplicates existing bundles!",
-							featureBundleID), e);
+			return null;
+		}
+
+		protected boolean duplicatesExistingBundle(ID featureBundleID) {
+			if (bundleIdsToSymbolicNamesVersions.containsKey(featureBundleID)) {
+				return existingBundles.containsKey(bundleIdsToSymbolicNamesVersions.get(featureBundleID));
+			} else {
+				Path featureBundlePath = getArtifactPath(featureBundleID);
+				if (featureBundlePath != null) {
+					try {
+						JarFile featureBundleJarFile = new JarFile(featureBundlePath.toFile());
+
+						Manifest featureBundleJarMf = featureBundleJarFile.getManifest();
+
+						if ((featureBundleJarMf != null) && (featureBundleJarMf.getMainAttributes() != null)) {
+							String featureBundleSymbolicName = featureBundleJarMf.getMainAttributes()
+									.getValue("Bundle-SymbolicName");
+							String featureBundleVersion = featureBundleJarMf.getMainAttributes()
+									.getValue("Bundle-Version");
+
+							if ((featureBundleSymbolicName != null) && (featureBundleVersion != null)) {
+								Map.Entry<String, String> bundleSymbolicNameAndVersion = Map
+										.entry(featureBundleSymbolicName, featureBundleVersion);
+
+								bundleIdsToSymbolicNamesVersions.put(featureBundleID, bundleSymbolicNameAndVersion);
+
+								return existingBundles.containsKey(bundleSymbolicNameAndVersion);
+							}
+						}
+
+					} catch (IOException e) {
+						LOG.error(String.format("Error checking for if bundle %s duplicates existing bundles!",
+								featureBundleID), e);
+					}
 				}
 			}
 
@@ -957,14 +995,12 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 		}
 	}
 
-	private List<String> getExistingBundlesSymbolicNames() {
-		List<String> existingBundlesSymbolicNames = new ArrayList<>();
-
-		for (Bundle bundle : bundleContext.getBundles()) {
-			existingBundlesSymbolicNames.add(bundle.getSymbolicName());
-		}
-
-		return existingBundlesSymbolicNames;
+	private Map<Map.Entry<String, String>, Long> getExistingBundles() {
+		// @formatter:off
+		return Arrays.stream(bundleContext.getBundles()).collect(Collectors.toMap(
+				b -> Map.entry(b.getSymbolicName(), b.getVersion().toString()), 
+				b -> Long.valueOf(b.getBundleId())));
+		// @formatter:on
 	}
 
 	private void setExternalFeatureId() {

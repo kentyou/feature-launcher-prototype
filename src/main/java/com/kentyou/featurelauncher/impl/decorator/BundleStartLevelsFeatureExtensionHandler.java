@@ -13,23 +13,22 @@
  */
 package com.kentyou.featurelauncher.impl.decorator;
 
-import java.util.List;
-import java.util.Optional;
-
-import org.osgi.framework.launch.FrameworkFactory;
-import org.osgi.service.feature.FeatureExtension;
 import org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler;
-import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 
 /**
  * Handler for
- * {@link org.osgi.service.featurelauncher.FeatureLauncherConstants.LAUNCH_FRAMEWORK}
+ * {@link org.osgi.service.featurelauncher.FeatureLauncherConstants.BUNDLE_START_LEVELS}
  * {@link org.osgi.service.feature.FeatureExtension}
  * 
  * @author Michael H. Siemaszko (mhs@into.software)
- * @since Sep 30, 2024
+ * @since Oct 28, 2024
  */
-public interface LaunchFrameworkFeatureExtensionHandler extends FeatureExtensionHandler {
-	Optional<FrameworkFactory> selectFrameworkFactory(FeatureExtension featureExtension,
-			List<ArtifactRepository> artifactRepositories, Optional<FrameworkFactory> defaultFrameworkFactoryOptional);
+public interface BundleStartLevelsFeatureExtensionHandler extends FeatureExtensionHandler {
+	boolean hasDefaultBundleStartLevel();
+
+	Integer getDefaultBundleStartLevel();
+
+	boolean hasMinimumFrameworkStartLevel();
+
+	Integer getMinimumFrameworkStartLevel();
 }

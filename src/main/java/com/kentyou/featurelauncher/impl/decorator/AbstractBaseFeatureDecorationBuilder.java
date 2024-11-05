@@ -13,6 +13,8 @@
  */
 package com.kentyou.featurelauncher.impl.decorator;
 
+import static com.kentyou.featurelauncher.impl.decorator.FeatureDecorationConstants.DEFAULT_DECORATED_TYPE;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -139,7 +141,8 @@ public abstract class AbstractBaseFeatureDecorationBuilder<T extends BaseFeature
 
 		ID decoratedFeatureID = featureService.getID(originalFeatureID.getGroupId(), originalFeatureID.getArtifactId(),
 				originalFeatureID.getVersion(),
-				originalFeatureID.getType().isPresent() ? originalFeatureID.getType().get() : null, classifier);
+				originalFeatureID.getType().isPresent() ? originalFeatureID.getType().get() : DEFAULT_DECORATED_TYPE,
+				classifier);
 
 		FeatureBuilder featureBuilder = featureService.getBuilderFactory().newFeatureBuilder(decoratedFeatureID);
 
