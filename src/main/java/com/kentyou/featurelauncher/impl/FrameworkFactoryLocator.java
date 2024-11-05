@@ -13,8 +13,6 @@
  */
 package com.kentyou.featurelauncher.impl;
 
-import static org.osgi.service.featurelauncher.FeatureLauncherConstants.LAUNCH_FRAMEWORK;
-
 import java.lang.StackWalker.StackFrame;
 import java.util.List;
 import java.util.Optional;
@@ -50,8 +48,8 @@ class FrameworkFactoryLocator {
 		 * can be found in any configured Artifact Repositories, as described in
 		 * Selecting a framework implementation on page 99"
 		 */
-		Optional<FrameworkFactory> selectFrameworkFactoryOptional = selectFrameworkFactory(feature,
-				decorationUtil, artifactRepositories);
+		Optional<FrameworkFactory> selectFrameworkFactoryOptional = decorationUtil
+				.getLaunchHandler().getLocatedFrameworkFactory();
 		if (selectFrameworkFactoryOptional.isPresent()) {
 			return selectFrameworkFactoryOptional.get();
 		}
@@ -80,13 +78,6 @@ class FrameworkFactoryLocator {
 		} else {
 			throw new LaunchException("Error loading default framework factory!");
 		}
-	}
-
-	private static Optional<FrameworkFactory> selectFrameworkFactory(Feature feature,
-			DecorationUtil decorationUtil, List<ArtifactRepository> artifactRepositories) {
-		return decorationUtil.getLaunchHandler()
-				.selectFrameworkFactory(feature.getExtensions().get(LAUNCH_FRAMEWORK),
-						artifactRepositories, loadDefaultFrameworkFactory());
 	}
 
 	private static Optional<FrameworkFactory> findFrameworkFactory() {

@@ -61,7 +61,7 @@ public class FeatureDecoratorImplTest {
 		featureService = ServiceLoaderUtil.loadFeatureService();
 		assertNotNull(featureService);
 
-		util = new DecorationUtil();
+		util = new DecorationUtil(List.of());
 
 		// Read feature
 		Path featureJSONPath = Paths.get(getClass().getResource("/features/gogo-console-feature.json").toURI());

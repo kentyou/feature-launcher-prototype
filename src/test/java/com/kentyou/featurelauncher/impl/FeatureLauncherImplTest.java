@@ -39,6 +39,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleException;
 import org.osgi.framework.Constants;
+import org.osgi.framework.Version;
 import org.osgi.framework.launch.Framework;
 import org.osgi.framework.startlevel.FrameworkStartLevel;
 import org.osgi.service.featurelauncher.FeatureLauncher;
@@ -252,6 +253,9 @@ public class FeatureLauncherImplTest {
 		Bundle[] bundles = osgiFramework.getBundleContext().getBundles();
 		assertEquals(15, bundles.length);
 
+		assertEquals("org.apache.felix.framework", bundles[0].getSymbolicName());
+		assertEquals(Version.parseVersion("7.0.5"), bundles[0].getVersion());
+
 		assertEquals("org.apache.felix.configadmin", bundles[1].getSymbolicName());
 		assertEquals("ACTIVE", BundleStateUtil.getBundleStateString(bundles[1].getState()));
 
@@ -295,6 +299,9 @@ public class FeatureLauncherImplTest {
 		// Verify bundles defined in feature are installed and started
 		Bundle[] bundles = osgiFramework.getBundleContext().getBundles();
 		assertEquals(4, bundles.length);
+
+		assertEquals("org.eclipse.osgi", bundles[0].getSymbolicName());
+		assertEquals(Version.parseVersion("3.21.0.v20240717-2103"), bundles[0].getVersion());
 
 		assertEquals("org.apache.felix.gogo.command", bundles[1].getSymbolicName());
 		assertEquals("ACTIVE", BundleStateUtil.getBundleStateString(bundles[1].getState()));

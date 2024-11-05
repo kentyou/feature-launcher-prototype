@@ -64,7 +64,7 @@ public class FeatureExtensionHandlerImplTest {
 		featureService = ServiceLoaderUtil.loadFeatureService();
 		assertNotNull(featureService);
 
-		util = new DecorationUtil();
+		util = new DecorationUtil(List.of());
 		
 		// Read feature
 		Path featureJSONPath = Paths
