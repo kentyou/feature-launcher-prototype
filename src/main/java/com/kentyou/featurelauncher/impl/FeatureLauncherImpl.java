@@ -29,6 +29,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -334,7 +335,18 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 
 		private void maybeSetFrameworkStartLevel(Framework framework) {
 			decorationUtil.getStartLevelHandler().getMinimumFrameworkStartLevel()
-				.ifPresent(sl -> framework.adapt(FrameworkStartLevel.class).setStartLevel(sl));
+				.ifPresent(sl -> {
+					FrameworkStartLevel startLevel = framework.adapt(FrameworkStartLevel.class);
+					if(startLevel.getStartLevel() < sl) {
+						Semaphore sem = new Semaphore(0);
+						startLevel.setStartLevel(sl, fe -> sem.release());
+						try {
+							sem.acquire();
+						} catch (InterruptedException e) {
+							throw new LaunchException("Interrupted while waiting for the start levels to change");
+						}
+					}
+				});
 		}
 
 		private void maybeSetInitialBundleStartLevel(Framework framework) {
@@ -347,14 +359,13 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			try {
 				framework.start();
 
-				maybeSetFrameworkStartLevel(framework);
-
 				maybeInstallAndStartDefaultConfigurationAdminTracker(framework.getBundleContext());
-
-				maybeWaitForConfigurationsToBeCreated();
 
 				startBundles();
 
+				maybeSetFrameworkStartLevel(framework);
+
+				maybeWaitForConfigurationsToBeCreated();
 			} catch (BundleException | InterruptedException e) {
 				////////////////////////////////////
 				// 160.4.3.6: Cleanup after failure
