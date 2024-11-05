@@ -23,3 +23,10 @@
 hs_err_pid*
 replay_pid*
 /target/
+dependency-reduced-pom.xml
+felix-cache
+
+# Eclipse settings
+.classpath
+.settings
+.project
