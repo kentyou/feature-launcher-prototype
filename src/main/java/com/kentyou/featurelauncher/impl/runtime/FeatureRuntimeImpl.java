@@ -252,7 +252,7 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 	}
 
 	abstract class AbstractOperationBuilderImpl<T extends OperationBuilder<T>> implements OperationBuilder<T> {
-		protected final DecorationUtil decorationUtil = new DecorationUtil();
+		protected DecorationUtil decorationUtil;
 		protected Feature feature;
 		protected boolean isCompleted;
 		protected boolean useDefaultRepositories;
@@ -391,6 +391,8 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 			if (this.useDefaultRepositories) {
 				getDefaultRepositories().forEach((k, v) -> this.artifactRepositories.putIfAbsent(k, v));
 			}
+
+			decorationUtil = new DecorationUtil(List.copyOf(this.artifactRepositories.values()));
 
 			return addOrUpdateFeature(feature);
 		}

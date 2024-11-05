@@ -28,6 +28,7 @@ import org.osgi.service.feature.FeatureService;
 import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
 import org.osgi.service.featurelauncher.decorator.FeatureDecorator;
 import org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler;
+import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,17 +57,21 @@ public class DecorationUtil {
 
 	private static final Logger LOG = LoggerFactory.getLogger(DecorationUtil.class);
 	
-	private final LaunchFrameworkFeatureExtensionHandlerImpl launchHandler = new LaunchFrameworkFeatureExtensionHandlerImpl();
+	private final LaunchFrameworkFeatureExtensionHandlerImpl launchHandler;
 	private final FrameworkLaunchingPropertiesFeatureExtensionHandlerImpl frameworkHandler = new FrameworkLaunchingPropertiesFeatureExtensionHandlerImpl();
 	private final BundleStartLevelsFeatureExtensionHandlerImpl startLevelHandler = new BundleStartLevelsFeatureExtensionHandlerImpl();
-	
-	// @formatter:off
-	private final Map<String, FeatureExtensionHandler> handlers = Map.ofEntries(
-			Map.entry(LAUNCH_FRAMEWORK, launchHandler),
-			Map.entry(FRAMEWORK_LAUNCHING_PROPERTIES, frameworkHandler),
-			Map.entry(BUNDLE_START_LEVELS, startLevelHandler));
-	// @formatter:on
+	private final Map<String, FeatureExtensionHandler> handlers;
 
+	public DecorationUtil(List<? extends ArtifactRepository> repositories) {
+		launchHandler = new LaunchFrameworkFeatureExtensionHandlerImpl(repositories);
+		// @formatter:off
+		handlers = Map.ofEntries(
+				Map.entry(LAUNCH_FRAMEWORK, launchHandler),
+				Map.entry(FRAMEWORK_LAUNCHING_PROPERTIES, frameworkHandler),
+				Map.entry(BUNDLE_START_LEVELS, startLevelHandler));
+		// @formatter:on
+	}
+	
 	public LaunchFrameworkFeatureExtensionHandlerImpl getLaunchHandler() {
 		return launchHandler;
 	}

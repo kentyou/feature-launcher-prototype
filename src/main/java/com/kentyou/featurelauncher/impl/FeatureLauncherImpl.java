@@ -109,7 +109,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 	}
 
 	class LaunchBuilderImpl implements LaunchBuilder {
-		private final DecorationUtil decorationUtil = new DecorationUtil();
+		private DecorationUtil decorationUtil;
 		private Feature feature;
 		private boolean isLaunched;
 		private List<Bundle> installedBundles;
@@ -243,6 +243,8 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 			ensureNotLaunchedYet();
 
 			this.isLaunched = true;
+			
+			decorationUtil = new DecorationUtil(this.artifactRepositories);
 
 			//////////////////////////////////////
 			// 160.4.3.1: Feature Decoration
