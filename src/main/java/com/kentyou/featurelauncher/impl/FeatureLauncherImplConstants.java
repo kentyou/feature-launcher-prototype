@@ -23,4 +23,6 @@ package com.kentyou.featurelauncher.impl;
  */
 public interface FeatureLauncherImplConstants {
 	String FRAMEWORK_STORAGE_CLEAN_TESTONLY = "testOnly";
+	
+	String CONFIGURATION_ADMIN_IMPL_DEFAULT = "org.apache.felix:org.apache.felix.configadmin:1.9.26";
 }

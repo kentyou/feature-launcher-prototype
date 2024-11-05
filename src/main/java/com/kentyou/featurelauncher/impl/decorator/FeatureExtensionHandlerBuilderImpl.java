@@ -14,6 +14,7 @@
 package com.kentyou.featurelauncher.impl.decorator;
 
 import org.osgi.service.feature.Feature;
+import org.osgi.service.feature.FeatureService;
 import org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler.FeatureExtensionHandlerBuilder;
 
 /**
@@ -25,8 +26,8 @@ import org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler.Featur
 public class FeatureExtensionHandlerBuilderImpl extends
 		AbstractBaseFeatureDecorationBuilder<FeatureExtensionHandlerBuilder> implements FeatureExtensionHandlerBuilder {
 
-	public FeatureExtensionHandlerBuilderImpl(Feature feature) {
-		super(feature);
+	public FeatureExtensionHandlerBuilderImpl(FeatureService featureService, Feature feature) {
+		super(featureService, feature);
 	}
 
 	/* 

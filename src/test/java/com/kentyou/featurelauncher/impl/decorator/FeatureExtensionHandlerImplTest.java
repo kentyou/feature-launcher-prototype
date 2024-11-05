@@ -40,11 +40,13 @@ import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
 import org.osgi.service.featurelauncher.decorator.DecoratorBuilderFactory;
 import org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler;
 
-import com.kentyou.featurelauncher.impl.util.FeatureDecorationUtil;
+import com.kentyou.featurelauncher.impl.util.DecorationUtil;
 import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
 
 /**
- * Tests {@link com.kentyou.featurelauncher.impl.util.FeatureDecorationUtil.executeFeatureExtensionHandlers(Feature, Map<String, FeatureExtensionHandler>)}
+ * Tests
+ * {@link com.kentyou.featurelauncher.impl.util.FeatureDecorationUtil.executeFeatureExtensionHandlers(Feature,
+ * Map<String, FeatureExtensionHandler>)}
  * 
  * @author Michael H. Siemaszko (mhs@into.software)
  * @since Oct 28, 2024
@@ -102,7 +104,7 @@ public class FeatureExtensionHandlerImplTest {
 			}
 		};
 
-		Feature decoratedFeature = FeatureDecorationUtil.executeFeatureExtensionHandlers(feature,
+		Feature decoratedFeature = DecorationUtil.executeFeatureExtensionHandlers(featureService, feature,
 				Map.of(FEATURE_EXTENSION_NAME, featureBundlesExtensionHandler));
 		assertNotNull(decoratedFeature);
 
@@ -144,7 +146,7 @@ public class FeatureExtensionHandlerImplTest {
 			}
 		};
 
-		Feature decoratedFeature = FeatureDecorationUtil.executeFeatureExtensionHandlers(feature,
+		Feature decoratedFeature = DecorationUtil.executeFeatureExtensionHandlers(featureService, feature,
 				Map.of(FEATURE_EXTENSION_NAME, featureConfigurationsExtensionHandler));
 		assertNotNull(decoratedFeature);
 
@@ -182,7 +184,7 @@ public class FeatureExtensionHandlerImplTest {
 			}
 		};
 
-		Feature decoratedFeature = FeatureDecorationUtil.executeFeatureExtensionHandlers(feature,
+		Feature decoratedFeature = DecorationUtil.executeFeatureExtensionHandlers(featureService, feature,
 				Map.of(FEATURE_EXTENSION_NAME, featureVariablesExtensionHandler));
 		assertNotNull(decoratedFeature);
 
@@ -218,7 +220,7 @@ public class FeatureExtensionHandlerImplTest {
 			}
 		};
 
-		Feature decoratedFeature = FeatureDecorationUtil.executeFeatureExtensionHandlers(feature,
+		Feature decoratedFeature = DecorationUtil.executeFeatureExtensionHandlers(featureService, feature,
 				Map.of(FEATURE_EXTENSION_NAME, featureNoOpExtensionHandler));
 		assertNotNull(decoratedFeature);
 
@@ -257,7 +259,7 @@ public class FeatureExtensionHandlerImplTest {
 		};
 
 		assertThrows(AbandonOperationException.class,
-				() -> FeatureDecorationUtil.executeFeatureExtensionHandlers(feature,
+				() -> DecorationUtil.executeFeatureExtensionHandlers(featureService, feature,
 						Map.of(FEATURE_EXTENSION_NAME, featureInvalidExtensionHandler)));
 	}
 
@@ -267,7 +269,7 @@ public class FeatureExtensionHandlerImplTest {
 		assertEquals(1, featureExtensions.size());
 		assertEquals(FEATURE_EXTENSION_NAME, featureExtensions.get(FEATURE_EXTENSION_NAME).getName());
 
-		assertThrows(AbandonOperationException.class,
-				() -> FeatureDecorationUtil.executeFeatureExtensionHandlers(feature, Collections.emptyMap()));
+		assertThrows(AbandonOperationException.class, () -> DecorationUtil
+				.executeFeatureExtensionHandlers(featureService, feature, Collections.emptyMap()));
 	}
 }

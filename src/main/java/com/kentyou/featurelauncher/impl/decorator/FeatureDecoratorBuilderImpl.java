@@ -20,6 +20,7 @@ import java.util.Objects;
 import org.osgi.service.feature.Feature;
 import org.osgi.service.feature.FeatureBuilder;
 import org.osgi.service.feature.FeatureExtension;
+import org.osgi.service.feature.FeatureService;
 import org.osgi.service.featurelauncher.decorator.FeatureDecorator.FeatureDecoratorBuilder;
 
 /**
@@ -32,8 +33,8 @@ public class FeatureDecoratorBuilderImpl extends AbstractBaseFeatureDecorationBu
 		implements FeatureDecoratorBuilder {
 	private List<FeatureExtension> extensions;
 
-	public FeatureDecoratorBuilderImpl(Feature feature) {
-		super(feature);
+	public FeatureDecoratorBuilderImpl(FeatureService featureService, Feature feature) {
+		super(featureService, feature);
 
 		this.extensions = new ArrayList<>();
 	}

@@ -29,13 +29,17 @@ import org.osgi.service.featurelauncher.runtime.InstalledFeature;
  */
 class InstalledFeatureImpl implements InstalledFeature {
 	private final Feature feature;
+	private final Feature originalFeature;
+	private final boolean isDecorated;
 	private final boolean isInitialLaunch;
 	private final List<InstalledBundle> installedBundles;
 	private final List<InstalledConfiguration> installedConfigurations;
 
-	public InstalledFeatureImpl(Feature feature, boolean isInitialLaunch, List<InstalledBundle> installedBundles,
-			List<InstalledConfiguration> installedConfigurations) {
+	public InstalledFeatureImpl(Feature feature, Feature originalFeature, boolean isDecorated, boolean isInitialLaunch,
+			List<InstalledBundle> installedBundles, List<InstalledConfiguration> installedConfigurations) {
 		this.feature = feature;
+		this.originalFeature = originalFeature;
+		this.isDecorated = isDecorated;
 		this.isInitialLaunch = isInitialLaunch;
 		this.installedBundles = installedBundles;
 		this.installedConfigurations = installedConfigurations;
@@ -56,9 +60,7 @@ class InstalledFeatureImpl implements InstalledFeature {
 	 */
 	@Override
 	public Feature getOriginalFeature() {
-		// TODO once decoration is implemented this will need to return
-		// the original undecorated feature
-		return feature;
+		return originalFeature;
 	}
 
 	/* 
@@ -67,11 +69,9 @@ class InstalledFeatureImpl implements InstalledFeature {
 	 */
 	@Override
 	public boolean isDecorated() {
-		// TODO once decoration is implemented this will need to return
-		// true if the feature has been decorated
-		return false;
-	}	
-	
+		return isDecorated;
+	}
+
 	/* 
 	 * (non-Javadoc)
 	 * @see org.osgi.service.featurelauncher.runtime.InstalledFeature#isInitialLaunch()
@@ -105,7 +105,8 @@ class InstalledFeatureImpl implements InstalledFeature {
 	 */
 	@Override
 	public int hashCode() {
-		return Objects.hash(feature, installedBundles, installedConfigurations, isInitialLaunch);
+		return Objects.hash(feature, installedBundles, installedConfigurations, isDecorated, isInitialLaunch,
+				originalFeature);
 	}
 
 	/* 
@@ -123,7 +124,8 @@ class InstalledFeatureImpl implements InstalledFeature {
 		InstalledFeatureImpl other = (InstalledFeatureImpl) obj;
 		return Objects.equals(feature, other.feature) && Objects.equals(installedBundles, other.installedBundles)
 				&& Objects.equals(installedConfigurations, other.installedConfigurations)
-				&& isInitialLaunch == other.isInitialLaunch;
+				&& isDecorated == other.isDecorated && isInitialLaunch == other.isInitialLaunch
+				&& Objects.equals(originalFeature, other.originalFeature);
 	}
 
 	/* 
@@ -132,8 +134,8 @@ class InstalledFeatureImpl implements InstalledFeature {
 	 */
 	@Override
 	public String toString() {
-		return "InstalledFeatureImpl [featureId=" + feature.getID() + ", originalFeatureId=" + feature.getID()
-				+ ", isInitialLaunch=" + isInitialLaunch + ", installedBundles=" + installedBundles
-				+ ", installedConfigurations=" + installedConfigurations + "]";
+		return "InstalledFeatureImpl [feature=" + feature.getID() + ", originalFeature=" + originalFeature.getID()
+				+ ", isDecorated=" + isDecorated + ", isInitialLaunch=" + isInitialLaunch + ", installedBundles="
+				+ installedBundles + ", installedConfigurations=" + installedConfigurations + "]";
 	}
 }

@@ -16,15 +16,13 @@ package com.kentyou.featurelauncher.impl.decorator;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.commons.text.StringSubstitutor;
 import org.osgi.service.feature.Feature;
 import org.osgi.service.feature.FeatureExtension;
 import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
 import org.osgi.service.featurelauncher.decorator.DecoratorBuilderFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import com.kentyou.featurelauncher.impl.util.FeatureDecorationUtil;
+import com.kentyou.featurelauncher.impl.util.DecorationUtil;
+import com.kentyou.featurelauncher.impl.util.VariablesUtil;
 
 /**
  * Implementation of {@link com.kentyou.featurelauncher.impl.decorator.FrameworkLaunchingPropertiesFeatureExtensionHandler}
@@ -34,9 +32,6 @@ import com.kentyou.featurelauncher.impl.util.FeatureDecorationUtil;
  */
 public class FrameworkLaunchingPropertiesFeatureExtensionHandlerImpl
 		implements FrameworkLaunchingPropertiesFeatureExtensionHandler {
-	private static final Logger LOG = LoggerFactory
-			.getLogger(FrameworkLaunchingPropertiesFeatureExtensionHandlerImpl.class);
-
 	private final Map<String, String> frameworkProperties;
 
 	private final Map<String, String> customProperties; // properties starting with a single underscore
@@ -55,11 +50,12 @@ public class FrameworkLaunchingPropertiesFeatureExtensionHandlerImpl
 			FeatureExtensionHandlerBuilder decoratedFeatureBuilder, DecoratorBuilderFactory factory)
 			throws AbandonOperationException {
 
-		Map<String, String> rawProperties = FeatureDecorationUtil.readFeatureExtensionJSON(extension.getJSON());
+		Map<String, Object> rawProperties = DecorationUtil.readFeatureExtensionJSON(extension.getJSON());
 
-		Map<String, String> properties = maybeSubstituteVariables(rawProperties, feature.getVariables());
+		Map<String, Object> properties = VariablesUtil.INSTANCE.maybeSubstituteVariables(rawProperties,
+				feature.getVariables());
 
-		for (Map.Entry<String, String> propertyEntry : properties.entrySet()) {
+		for (Map.Entry<String, Object> propertyEntry : properties.entrySet()) {
 			String propertyName = propertyEntry.getKey();
 			String propertyValue = propertyEntry.getValue().toString();
 
@@ -91,24 +87,5 @@ public class FrameworkLaunchingPropertiesFeatureExtensionHandlerImpl
 	@Override
 	public Map<String, String> getCustomProperties() {
 		return customProperties;
-	}
-
-	private Map<String, String> maybeSubstituteVariables(Map<String, String> properties,
-			Map<String, Object> featureVariables) {
-		if (!properties.isEmpty() && !featureVariables.isEmpty()) {
-			StringSubstitutor variablesSubstitutor = new StringSubstitutor(featureVariables);
-			Map<String, String> substituted = new HashMap<>();
-
-			for (Map.Entry<String, String> propertyEntry : properties.entrySet()) {
-				String propertyName = propertyEntry.getKey();
-				String propertyValue = propertyEntry.getValue();
-
-				substituted.put(propertyName, variablesSubstitutor.replace(propertyValue));
-			}
-
-			return substituted;
-		}
-
-		return properties;
 	}
 }

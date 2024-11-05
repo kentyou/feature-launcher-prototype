@@ -15,6 +15,7 @@ package com.kentyou.featurelauncher.impl;
 
 import static org.osgi.service.featurelauncher.FeatureLauncherConstants.LAUNCH_FRAMEWORK;
 
+import java.lang.StackWalker.StackFrame;
 import java.util.List;
 import java.util.Optional;
 import java.util.ServiceLoader;
@@ -27,7 +28,7 @@ import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
 import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 
 import com.kentyou.featurelauncher.impl.decorator.LaunchFrameworkFeatureExtensionHandler;
-import com.kentyou.featurelauncher.impl.util.FeatureDecorationUtil;
+import com.kentyou.featurelauncher.impl.util.DecorationUtil;
 
 /**
  * 160.4.3.2: Locating a framework implementation
@@ -36,6 +37,8 @@ import com.kentyou.featurelauncher.impl.util.FeatureDecorationUtil;
  * @since Sep 18, 2024
  */
 class FrameworkFactoryLocator {
+	static final int FIND_FRAMEWORK_CALLER_CLASS_SKIP = 4;
+
 	public static FrameworkFactory locateFrameworkFactory(Feature feature,
 			List<ArtifactRepository> artifactRepositories) {
 		/*
@@ -50,35 +53,24 @@ class FrameworkFactoryLocator {
 		 * can be found in any configured Artifact Repositories, as described in
 		 * Selecting a framework implementation on page 99"
 		 */
-		if (FeatureDecorationUtil.hasLaunchFrameworkFeatureExtension(feature.getExtensions())) {
-			LaunchFrameworkFeatureExtensionHandler launchFrameworkFeatureExtensionHandler;
-			try {
-				launchFrameworkFeatureExtensionHandler = FeatureDecorationUtil
-						.getBuiltInHandlerForExtension(LAUNCH_FRAMEWORK);
-			} catch (AbandonOperationException e) {
-				throw new LaunchException(e.getMessage(), e);
-			}
-
-			FeatureExtension launchFrameworkFeatureExtension = feature.getExtensions().get(LAUNCH_FRAMEWORK);
-
-			Optional<FrameworkFactory> selectFrameworkFactoryOptional = launchFrameworkFeatureExtensionHandler
-					.selectFrameworkFactory(launchFrameworkFeatureExtension, artifactRepositories,
-							loadDefaultFrameworkFactory());
-			if (selectFrameworkFactoryOptional.isPresent()) {
-				return selectFrameworkFactoryOptional.get();
-			} else if (FeatureDecorationUtil.isExtensionMandatory(launchFrameworkFeatureExtension)) {
-				throw new LaunchException("No suitable OSGi framework implementation could be selected!");
-			}
+		Optional<FrameworkFactory> selectFrameworkFactoryOptional = selectFrameworkFactory(feature,
+				artifactRepositories);
+		if (selectFrameworkFactoryOptional.isPresent()) {
+			return selectFrameworkFactoryOptional.get();
 		}
 
 		/*
-		 * TODO: "160.4.3.2: #3. If no framework implementation is found in the previous
-		 * steps then the Feature Launcher implementation must search the classpath
-		 * using the Thread Context Class Loader, or, if the Thread Context Class Loader
-		 * is not set, the Class Loader which loaded the caller of the Feature
-		 * Launcher's launch method. The first suitable framework instance located is
-		 * the instance that will be used."
+		 * "160.4.3.2: #3. If no framework implementation is found in the previous steps
+		 * then the Feature Launcher implementation must search the classpath using the
+		 * Thread Context Class Loader, or, if the Thread Context Class Loader is not
+		 * set, the Class Loader which loaded the caller of the Feature Launcher's
+		 * launch method. The first suitable framework instance located is the instance
+		 * that will be used."
 		 */
+		Optional<FrameworkFactory> findFrameworkFactoryOptional = findFrameworkFactory();
+		if (findFrameworkFactoryOptional.isPresent()) {
+			return findFrameworkFactoryOptional.get();
+		}
 
 		/*
 		 * 160.4.3.2: #4. In the event that no suitable OSGi framework can be found by
@@ -93,28 +85,66 @@ class FrameworkFactoryLocator {
 		}
 	}
 
-	/*
-	 * "160.4.3.2: #3. If no framework implementation is found in the previous steps
-	 * then the Feature Launcher implementation must search the classpath using the
-	 * Thread Context Class Loader, or, if the Thread Context Class Loader is not
-	 * set, the Class Loader which loaded the caller of the Feature Launcher's
-	 * launch method. The first suitable framework instance located is the instance
-	 * that will be used."
-	 */
-	@SuppressWarnings("unused")
-	private static FrameworkFactory findFrameworkFactory() {
-		// TODO: 160.4.3.2: #3
-		return null;
+	private static Optional<FrameworkFactory> selectFrameworkFactory(Feature feature,
+			List<ArtifactRepository> artifactRepositories) {
+		Optional<FrameworkFactory> selectFrameworkFactoryOptional = Optional.empty();
+
+		if (DecorationUtil.hasLaunchFrameworkFeatureExtension(feature.getExtensions())) {
+			LaunchFrameworkFeatureExtensionHandler launchFrameworkFeatureExtensionHandler;
+			try {
+				launchFrameworkFeatureExtensionHandler = DecorationUtil
+						.getBuiltInHandlerForExtension(LAUNCH_FRAMEWORK);
+			} catch (AbandonOperationException e) {
+				throw new LaunchException(e.getMessage(), e);
+			}
+
+			FeatureExtension launchFrameworkFeatureExtension = feature.getExtensions().get(LAUNCH_FRAMEWORK);
+
+			selectFrameworkFactoryOptional = launchFrameworkFeatureExtensionHandler.selectFrameworkFactory(
+					launchFrameworkFeatureExtension, artifactRepositories, loadDefaultFrameworkFactory());
+
+			if (selectFrameworkFactoryOptional.isEmpty()
+					&& DecorationUtil.isExtensionMandatory(launchFrameworkFeatureExtension)) {
+				throw new LaunchException("No suitable OSGi framework implementation could be selected!");
+			}
+		}
+
+		return selectFrameworkFactoryOptional;
 	}
 
-	/*
-	 * 160.4.3.2: #4. In the event that no suitable OSGi framework can be found by
-	 * any of the previous steps then the Feature Launcher implementation may
-	 * provide a default framework implementation to be used.
-	 */
+	private static Optional<FrameworkFactory> findFrameworkFactory() {
+		ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+		if (classLoader == null) {
+			Optional<Class<?>> callerClassOptional = getCallerClass();
+			if (callerClassOptional.isPresent()) {
+				classLoader = callerClassOptional.get().getClassLoader();
+			} else {
+				classLoader = ClassLoader.getSystemClassLoader();
+			}
+		}
+
+		ServiceLoader<FrameworkFactory> serviceLoader = ServiceLoader.load(FrameworkFactory.class, classLoader);
+
+		return serviceLoader.findFirst();
+	}
+
 	private static Optional<FrameworkFactory> loadDefaultFrameworkFactory() {
 		ServiceLoader<FrameworkFactory> loader = ServiceLoader.load(FrameworkFactory.class);
 		return loader.findFirst();
+	}
+
+	private static Optional<Class<?>> getCallerClass() {
+		// @formatter:off
+		Object raw = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE)
+				.walk(s -> s.map(StackFrame::getDeclaringClass)
+							.skip(FIND_FRAMEWORK_CALLER_CLASS_SKIP)
+							.findFirst());
+		// @formatter:on
+
+		@SuppressWarnings("unchecked")
+		Optional<Class<?>> callerClass = (Optional<Class<?>>) raw;
+
+		return callerClass;
 	}
 
 	private FrameworkFactoryLocator() {

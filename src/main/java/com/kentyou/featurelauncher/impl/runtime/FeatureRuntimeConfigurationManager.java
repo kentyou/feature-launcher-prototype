@@ -21,8 +21,6 @@ import static com.kentyou.featurelauncher.impl.util.ConfigurationUtil.normalizeP
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Dictionary;
-import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -31,23 +29,25 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.osgi.framework.FrameworkUtil;
 import org.osgi.framework.InvalidSyntaxException;
 import org.osgi.service.cm.Configuration;
 import org.osgi.service.cm.ConfigurationAdmin;
+import org.osgi.service.cm.Configuration.ConfigurationAttribute;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.feature.FeatureConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.kentyou.featurelauncher.impl.util.VariablesUtil;
+
 /**
  * Manages feature configurations via Configuration Admin Service for
  * {@link com.kentyou.featurelauncher.impl.runtime.FeatureRuntimeImpl}
  * 
- * As defined in the following sections of the "160. Feature Launcher Service Specification":
- *  - 160.4.3.4
- *  - 160.4.3.5
- *  - 160.5.2.1.3
+ * As defined in the following sections of the "160. Feature Launcher Service
+ * Specification": - 160.4.3.4 - 160.4.3.5 - 160.5.2.1.3
  * 
  * @author Michael H. Siemaszko (mhs@into.software)
  * @since Oct 4, 2024
@@ -59,8 +59,9 @@ public class FeatureRuntimeConfigurationManager {
 	@Reference
 	ConfigurationAdmin configurationAdmin;
 
-	public void createConfigurations(List<FeatureConfiguration> featureConfigurations) {
-		featureConfigurations.forEach(this::createConfiguration);
+	public void createConfigurations(List<FeatureConfiguration> featureConfigurations,
+			Map<String, Object> featureVariables) {
+		featureConfigurations.forEach(fc -> createConfiguration(fc, featureVariables));
 	}
 
 	public void removeConfigurations(Set<String> featuresConfigurationsPids) {
@@ -104,9 +105,9 @@ public class FeatureRuntimeConfigurationManager {
 		// @formatter:on
 	}
 
-	public void createConfiguration(FeatureConfiguration featureConfiguration) {
+	public void createConfiguration(FeatureConfiguration featureConfiguration, Map<String, Object> featureVariables) {
 		if (featureConfiguration.getFactoryPid().isPresent()) {
-			createFactoryConfiguration(featureConfiguration);
+			createFactoryConfiguration(featureConfiguration, featureVariables);
 			return;
 		}
 
@@ -116,14 +117,19 @@ public class FeatureRuntimeConfigurationManager {
 			Configuration configuration = configurationAdmin.getConfiguration(featureConfiguration.getPid(),
 					CONFIGURATION_DEFAULT_LOCATION);
 
-			updateConfigurationProperties(configuration, featureConfiguration);
+			if (!isReadOnly(configuration)) {
+				updateConfigurationProperties(configuration, featureConfiguration, featureVariables);
+			} else {
+				LOG.warn(String.format("Configuration %s is read only!", featureConfiguration.getPid()));
+			}
 
 		} catch (IllegalArgumentException | IOException e) {
 			LOG.error(String.format("Error creating configuration %s!", featureConfiguration.getPid()), e);
 		}
 	}
 
-	private void createFactoryConfiguration(FeatureConfiguration featureConfiguration) {
+	private void createFactoryConfiguration(FeatureConfiguration featureConfiguration,
+			Map<String, Object> featureVariables) {
 		try {
 			LOG.info(String.format("Creating factory configuration %s", featureConfiguration.getPid()));
 
@@ -131,20 +137,26 @@ public class FeatureRuntimeConfigurationManager {
 					featureConfiguration.getFactoryPid().get(), normalizePid(featureConfiguration.getPid()),
 					CONFIGURATION_DEFAULT_LOCATION);
 
-			updateConfigurationProperties(configuration, featureConfiguration);
+			if (!isReadOnly(configuration)) {
+				updateConfigurationProperties(configuration, featureConfiguration, featureVariables);
+			} else {
+				LOG.warn(String.format("Configuration %s is read only!", featureConfiguration.getPid()));
+			}
 
 		} catch (IllegalArgumentException | IOException e) {
 			LOG.error(String.format("Error creating configuration %s!", featureConfiguration.getPid()), e);
 		}
 	}
 
-	private void updateConfigurationProperties(Configuration configuration, FeatureConfiguration featureConfiguration) {
-		Dictionary<String, Object> configurationProperties = new Hashtable<>(featureConfiguration.getValues());
+	private void updateConfigurationProperties(Configuration configuration, FeatureConfiguration featureConfiguration,
+			Map<String, Object> featureVariables) {
+		Map<String, Object> configurationProperties = VariablesUtil.INSTANCE
+				.maybeSubstituteVariables(featureConfiguration.getValues(), featureVariables);
 
 		configurationProperties.put(CONFIGURATIONS_FILTER, Boolean.TRUE);
 
 		try {
-			configuration.updateIfDifferent(configurationProperties);
+			configuration.updateIfDifferent(FrameworkUtil.asDictionary(configurationProperties));
 		} catch (IOException e) {
 			LOG.error(String.format("Error updating configuration properties %s!", featureConfiguration.getPid()), e);
 		}
@@ -157,5 +169,10 @@ public class FeatureRuntimeConfigurationManager {
 				.map(s -> s.collect(Collectors.toMap(Configuration::getPid, Function.identity())))
 				.orElse(Map.of());
 		// @formatter:on
+	}
+
+	private boolean isReadOnly(Configuration configuration) {
+		Set<ConfigurationAttribute> configurationAttributes = configuration.getAttributes();
+		return (configurationAttributes != null && configurationAttributes.contains(ConfigurationAttribute.READ_ONLY));
 	}
 }

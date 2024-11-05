@@ -26,6 +26,7 @@ import java.util.Objects;
 
 import org.osgi.service.feature.Feature;
 import org.osgi.service.feature.FeatureExtension;
+import org.osgi.service.feature.FeatureService;
 import org.osgi.service.feature.ID;
 import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
 import org.osgi.service.featurelauncher.decorator.FeatureDecorator;
@@ -52,7 +53,7 @@ import jakarta.json.JsonValue;
  * @author Michael H. Siemaszko (mhs@into.software)
  * @since Oct 27, 2024
  */
-public class FeatureDecorationUtil {
+public class DecorationUtil {
 
 	// @formatter:off
 	private static final Map<String, FeatureExtensionHandler> EXTENSION_TO_BUILTIN_HANDLER_MAP = Map.ofEntries(
@@ -61,17 +62,17 @@ public class FeatureDecorationUtil {
 			Map.entry(BUNDLE_START_LEVELS, new BundleStartLevelsFeatureExtensionHandlerImpl()));
 	// @formatter:on
 
-	private FeatureDecorationUtil() {
+	private DecorationUtil() {
 		// hidden constructor
 	}
 
-	public static Feature executeFeatureDecorators(Feature feature, List<FeatureDecorator> decorators)
-			throws AbandonOperationException {
+	public static Feature executeFeatureDecorators(FeatureService featureService, Feature feature,
+			List<FeatureDecorator> decorators) throws AbandonOperationException {
 		Feature originalFeature = feature;
 
 		for (FeatureDecorator decorator : decorators) {
-			feature = decorator.decorate(feature, new FeatureDecoratorBuilderImpl(feature),
-					new DecoratorBuilderFactoryImpl());
+			feature = decorator.decorate(feature, new FeatureDecoratorBuilderImpl(featureService, feature),
+					new DecoratorBuilderFactoryImpl(featureService));
 		}
 
 		enforceValidFeature(originalFeature, feature);
@@ -79,7 +80,7 @@ public class FeatureDecorationUtil {
 		return feature;
 	}
 
-	public static Feature executeFeatureExtensionHandlers(Feature feature,
+	public static Feature executeFeatureExtensionHandlers(FeatureService featureService, Feature feature,
 			Map<String, FeatureExtensionHandler> extensionHandlers) throws AbandonOperationException {
 		Feature originalFeature = feature;
 
@@ -94,7 +95,8 @@ public class FeatureDecorationUtil {
 
 			if (handlerForExtension != null) {
 				feature = handlerForExtension.handle(feature, featureExtension,
-						new FeatureExtensionHandlerBuilderImpl(feature), new DecoratorBuilderFactoryImpl());
+						new FeatureExtensionHandlerBuilderImpl(featureService, feature),
+						new DecoratorBuilderFactoryImpl(featureService));
 
 			} else if (isExtensionMandatory(featureExtension)) {
 				throw new AbandonOperationException(String
@@ -154,9 +156,9 @@ public class FeatureDecorationUtil {
 		return false;
 	}
 
-	public static Map<String, String> readFeatureExtensionJSON(String jsonString) {
+	public static Map<String, Object> readFeatureExtensionJSON(String jsonString) {
 		try (JsonReader jsonReader = Json.createReader(new StringReader(jsonString))) {
-			Map<String, String> properties = new HashMap<>();
+			Map<String, Object> properties = new HashMap<>();
 
 			JsonObject json = jsonReader.readObject();
 
@@ -167,11 +169,11 @@ public class FeatureDecorationUtil {
 				if (propertyValue instanceof JsonString) {
 					properties.put(propertyName, ((JsonString) propertyValue).getString());
 				} else if (propertyValue instanceof JsonNumber) {
-					properties.put(propertyName, ((JsonNumber) propertyValue).numberValue().toString());
+					properties.put(propertyName, ((JsonNumber) propertyValue).bigDecimalValue());
 				} else if (propertyValue == JsonValue.TRUE) {
-					properties.put(propertyName, Boolean.TRUE.toString());
+					properties.put(propertyName, Boolean.TRUE);
 				} else if (propertyValue == JsonValue.FALSE) {
-					properties.put(propertyName, Boolean.FALSE.toString());
+					properties.put(propertyName, Boolean.FALSE);
 				} else if (propertyValue.equals(JsonValue.NULL)) {
 					properties.put(propertyName, null);
 				}

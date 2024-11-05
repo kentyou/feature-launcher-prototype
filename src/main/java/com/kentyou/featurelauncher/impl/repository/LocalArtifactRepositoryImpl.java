@@ -140,9 +140,11 @@ class LocalArtifactRepositoryImpl implements FileSystemArtifactRepository {
 		artifactName.append(".");
 		artifactName.append(getExtensionForType(id.getType()));
 
-		// TODO: maybe use java.nio.file.Path.resolve(Path) instead ?
-		Path artifactM2RepoPath = Paths.get(projectHome.toAbsolutePath().toString(), id.getArtifactId(),
-				id.getVersion(), artifactName.toString());
+		Path artifactM2RepoPath = Paths.get(projectHome.toAbsolutePath().toString())
+				.resolve(id.getArtifactId())
+				.resolve(id.getVersion())
+				.resolve(artifactName.toString());
+
 		if (Files.exists(artifactM2RepoPath)) {
 			return artifactM2RepoPath;
 		} else {
