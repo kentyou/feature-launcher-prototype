@@ -25,8 +25,6 @@ import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
 import org.osgi.service.featurelauncher.decorator.DecoratorBuilderFactory;
 import org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler;
 
-import com.kentyou.featurelauncher.impl.util.DecorationUtil;
-
 /**
  * Implementation of
  * {@link com.kentyou.featurelauncher.impl.decorator.BundleStartLevelsFeatureExtensionHandler}
@@ -54,7 +52,7 @@ public class BundleStartLevelsFeatureExtensionHandlerImpl implements FeatureExte
 			FeatureExtensionHandlerBuilder decoratedFeatureBuilder, DecoratorBuilderFactory factory)
 			throws AbandonOperationException {
 
-		Map<String, Object> properties = DecorationUtil.readFeatureExtensionJSON(extension.getJSON());
+		Map<String, Object> properties = DecorationContext.readFeatureExtensionJSON(extension.getJSON());
 
 		// The minimum required framework start level after installing this feature
 		if (properties.containsKey(BUNDLE_START_LEVELS_MINIMUM)) {

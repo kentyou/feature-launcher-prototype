@@ -23,7 +23,7 @@ import org.osgi.service.feature.Feature;
 import org.osgi.service.featurelauncher.LaunchException;
 import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 
-import com.kentyou.featurelauncher.impl.util.DecorationUtil;
+import com.kentyou.featurelauncher.impl.decorator.DecorationContext;
 
 /**
  * 160.4.3.2: Locating a framework implementation
@@ -35,7 +35,7 @@ class FrameworkFactoryLocator {
 	static final int FIND_FRAMEWORK_CALLER_CLASS_SKIP = 4;
 
 	public static FrameworkFactory locateFrameworkFactory(Feature feature,
-			DecorationUtil decorationUtil, List<ArtifactRepository> artifactRepositories) {
+			DecorationContext decorationUtil, List<ArtifactRepository> artifactRepositories) {
 		/*
 		 * TODO: "160.4.3.2: #1. If any provider specific configuration has been given
 		 * to the Feature Launcher implementation then this should be used to identify

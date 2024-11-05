@@ -39,7 +39,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.kentyou.featurelauncher.impl.repository.FileSystemArtifactRepository;
-import com.kentyou.featurelauncher.impl.util.DecorationUtil;
 
 /**
  * Implementation of {@link com.kentyou.featurelauncher.impl.decorator.LaunchFrameworkFeatureExtensionHandler}
@@ -81,7 +80,7 @@ public class LaunchFrameworkFeatureExtensionHandlerImpl implements FeatureExtens
 			}
 		}
 		
-		if(locatedFramework.isEmpty() && DecorationUtil.isExtensionMandatory(extension)) {
+		if(locatedFramework.isEmpty() && DecorationContext.isExtensionMandatory(extension)) {
 			throw new AbandonOperationException("No suitable OSGi framework implementation could be selected for the mandatory launch extension!");
 		}
 		

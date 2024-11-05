@@ -11,7 +11,7 @@
  * Contributors:
  *     Kentyou - initial implementation
  */
-package com.kentyou.featurelauncher.impl.util;
+package com.kentyou.featurelauncher.impl.decorator;
 
 import static org.osgi.service.featurelauncher.FeatureLauncherConstants.BUNDLE_START_LEVELS;
 import static org.osgi.service.featurelauncher.FeatureLauncherConstants.FRAMEWORK_LAUNCHING_PROPERTIES;
@@ -32,13 +32,6 @@ import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.kentyou.featurelauncher.impl.decorator.BundleStartLevelsFeatureExtensionHandlerImpl;
-import com.kentyou.featurelauncher.impl.decorator.DecoratorBuilderFactoryImpl;
-import com.kentyou.featurelauncher.impl.decorator.FeatureDecoratorBuilderImpl;
-import com.kentyou.featurelauncher.impl.decorator.FeatureExtensionHandlerBuilderImpl;
-import com.kentyou.featurelauncher.impl.decorator.FrameworkLaunchingPropertiesFeatureExtensionHandlerImpl;
-import com.kentyou.featurelauncher.impl.decorator.LaunchFrameworkFeatureExtensionHandlerImpl;
-
 import jakarta.json.Json;
 import jakarta.json.JsonNumber;
 import jakarta.json.JsonObject;
@@ -53,16 +46,16 @@ import jakarta.json.JsonValue;
  * @author Michael H. Siemaszko (mhs@into.software)
  * @since Oct 27, 2024
  */
-public class DecorationUtil {
+public class DecorationContext {
 
-	private static final Logger LOG = LoggerFactory.getLogger(DecorationUtil.class);
+	private static final Logger LOG = LoggerFactory.getLogger(DecorationContext.class);
 	
 	private final LaunchFrameworkFeatureExtensionHandlerImpl launchHandler;
 	private final FrameworkLaunchingPropertiesFeatureExtensionHandlerImpl frameworkHandler = new FrameworkLaunchingPropertiesFeatureExtensionHandlerImpl();
 	private final BundleStartLevelsFeatureExtensionHandlerImpl startLevelHandler = new BundleStartLevelsFeatureExtensionHandlerImpl();
 	private final Map<String, FeatureExtensionHandler> handlers;
 
-	public DecorationUtil(List<? extends ArtifactRepository> repositories) {
+	public DecorationContext(List<? extends ArtifactRepository> repositories) {
 		launchHandler = new LaunchFrameworkFeatureExtensionHandlerImpl(repositories);
 		// @formatter:off
 		handlers = Map.ofEntries(
@@ -138,34 +131,6 @@ public class DecorationUtil {
 
 	public static boolean isExtensionMandatory(FeatureExtension featureExtension) {
 		return featureExtension.getKind() == FeatureExtension.Kind.MANDATORY;
-	}
-
-	public static boolean hasLaunchFrameworkFeatureExtension(Map<String, FeatureExtension> featureExtensions) {
-		if (!featureExtensions.isEmpty() && featureExtensions.containsKey(LAUNCH_FRAMEWORK)) {
-			return ((featureExtensions.get(LAUNCH_FRAMEWORK).getType() == FeatureExtension.Type.ARTIFACTS)
-					&& !featureExtensions.get(LAUNCH_FRAMEWORK).getArtifacts().isEmpty());
-		}
-
-		return false;
-	}
-
-	public static boolean hasFrameworkLaunchingPropertiesFeatureExtension(
-			Map<String, FeatureExtension> featureExtensions) {
-		if (!featureExtensions.isEmpty() && featureExtensions.containsKey(FRAMEWORK_LAUNCHING_PROPERTIES)) {
-			return ((featureExtensions.get(FRAMEWORK_LAUNCHING_PROPERTIES).getType() == FeatureExtension.Type.JSON)
-					&& !featureExtensions.get(FRAMEWORK_LAUNCHING_PROPERTIES).getJSON().isBlank());
-		}
-
-		return false;
-	}
-
-	public static boolean hasBundleStartLevelsFeatureExtension(Map<String, FeatureExtension> featureExtensions) {
-		if (!featureExtensions.isEmpty() && featureExtensions.containsKey(BUNDLE_START_LEVELS)) {
-			return ((featureExtensions.get(BUNDLE_START_LEVELS).getType() == FeatureExtension.Type.JSON)
-					&& !featureExtensions.get(BUNDLE_START_LEVELS).getJSON().isBlank());
-		}
-
-		return false;
 	}
 
 	public static Map<String, Object> readFeatureExtensionJSON(String jsonString) {

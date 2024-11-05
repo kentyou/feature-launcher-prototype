@@ -39,7 +39,6 @@ import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
 import org.osgi.service.featurelauncher.decorator.DecoratorBuilderFactory;
 import org.osgi.service.featurelauncher.decorator.FeatureDecorator;
 
-import com.kentyou.featurelauncher.impl.util.DecorationUtil;
 import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
 
 /**
@@ -53,7 +52,7 @@ import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
 public class FeatureDecoratorImplTest {
 	FeatureService featureService;
 	Feature feature;
-	DecorationUtil util;
+	DecorationContext util;
 
 	@BeforeEach
 	public void setUp() throws URISyntaxException, IOException {
@@ -61,7 +60,7 @@ public class FeatureDecoratorImplTest {
 		featureService = ServiceLoaderUtil.loadFeatureService();
 		assertNotNull(featureService);
 
-		util = new DecorationUtil(List.of());
+		util = new DecorationContext(List.of());
 
 		// Read feature
 		Path featureJSONPath = Paths.get(getClass().getResource("/features/gogo-console-feature.json").toURI());

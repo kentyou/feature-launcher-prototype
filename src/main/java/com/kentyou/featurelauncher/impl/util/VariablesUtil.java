@@ -13,11 +13,12 @@
  */
 package com.kentyou.featurelauncher.impl.util;
 
-import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-import org.apache.commons.text.StringSubstitutor;
+import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
 
 /**
  * Util for variables substitution operations.
@@ -25,44 +26,45 @@ import org.apache.commons.text.StringSubstitutor;
  * @author Michael H. Siemaszko (mhs@into.software)
  * @since Nov 2, 2024
  */
-public enum VariablesUtil {
-	INSTANCE;
+public class VariablesUtil {
 
-	public Map<String, Object> maybeSubstituteVariables(Map<String, Object> properties, Map<String, Object> variables) {
+	private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\$\\{(.+?)\\}");
+	
+	public static Map<String, Object> maybeSubstituteVariables(Map<String, Object> properties, Map<String, Object> variables) throws IllegalArgumentException {
 		if (!properties.isEmpty() && !variables.isEmpty()) {
-			StringSubstitutor variablesSubstitutor = new StringSubstitutor(variables);
 			Map<String, Object> substituted = new HashMap<>();
 
 			for (Map.Entry<String, Object> propertyEntry : properties.entrySet()) {
-				String propertyName = String.valueOf(propertyEntry.getKey());
+				String propertyName = propertyEntry.getKey();
 
 				Object rawPropertyValue = propertyEntry.getValue();
-
-				Object convertedPropertyValue = null;
-
-				if (rawPropertyValue != null) {
-					convertedPropertyValue = convertSubstitutedValue(rawPropertyValue.getClass(),
-							variablesSubstitutor.replace(rawPropertyValue));
+				
+				if (rawPropertyValue instanceof String s) {
+					Matcher matcher = PLACEHOLDER_PATTERN.matcher(s);
+					StringBuilder sb = new StringBuilder();
+					int from = 0;
+					while(matcher.find()) {
+						sb.append(s, from, matcher.start());
+						String name = matcher.group(1);
+						if(!variables.containsKey(name)) {
+							throw new IllegalArgumentException("There is no variable defined for name " + name);
+						}
+						sb.append(variables.get(name));
+						from = matcher.end();
+					}
+					if(s.length() > from) {
+						sb.append(s, from, s.length());
+					}
+					substituted.put(propertyName, sb.toString());
+				} else {
+					substituted.put(propertyName, rawPropertyValue);
 				}
 
-				substituted.put(propertyName, convertedPropertyValue);
 			}
 
 			return substituted;
 		}
 
 		return new HashMap<>(properties);
-	}
-
-	private Object convertSubstitutedValue(Class<?> rawPropertyValueType, String convertedPropertyValue) {
-		if (rawPropertyValueType.isAssignableFrom(BigDecimal.class)) {
-			return new BigDecimal(convertedPropertyValue);
-
-		} else if (rawPropertyValueType.isAssignableFrom(Boolean.class)) {
-			return Boolean.valueOf(convertedPropertyValue);
-
-		} else {
-			return convertedPropertyValue;
-		}
 	}
 }

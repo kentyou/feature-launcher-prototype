@@ -150,7 +150,7 @@ public class FeatureRuntimeConfigurationManager {
 
 	private void updateConfigurationProperties(Configuration configuration, FeatureConfiguration featureConfiguration,
 			Map<String, Object> featureVariables) {
-		Map<String, Object> configurationProperties = VariablesUtil.INSTANCE
+		Map<String, Object> configurationProperties = VariablesUtil
 				.maybeSubstituteVariables(featureConfiguration.getValues(), featureVariables);
 
 		configurationProperties.put(CONFIGURATIONS_FILTER, Boolean.TRUE);

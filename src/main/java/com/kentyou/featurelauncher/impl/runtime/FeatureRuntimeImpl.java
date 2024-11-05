@@ -72,10 +72,10 @@ import org.osgi.service.featurelauncher.runtime.RuntimeConfigurationMerge.Featur
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.kentyou.featurelauncher.impl.decorator.DecorationContext;
 import com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryFactoryImpl;
 import com.kentyou.featurelauncher.impl.repository.FileSystemArtifactRepository;
 import com.kentyou.featurelauncher.impl.util.ArtifactRepositoryUtil;
-import com.kentyou.featurelauncher.impl.util.DecorationUtil;
 
 /**
  * 160.5 The Feature Runtime Service
@@ -252,7 +252,7 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 	}
 
 	abstract class AbstractOperationBuilderImpl<T extends OperationBuilder<T>> implements OperationBuilder<T> {
-		protected DecorationUtil decorationUtil;
+		protected DecorationContext decorationUtil;
 		protected Feature feature;
 		protected boolean isCompleted;
 		protected boolean useDefaultRepositories;
@@ -392,7 +392,7 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 				getDefaultRepositories().forEach((k, v) -> this.artifactRepositories.putIfAbsent(k, v));
 			}
 
-			decorationUtil = new DecorationUtil(List.copyOf(this.artifactRepositories.values()));
+			decorationUtil = new DecorationContext(List.copyOf(this.artifactRepositories.values()));
 
 			return addOrUpdateFeature(feature);
 		}
