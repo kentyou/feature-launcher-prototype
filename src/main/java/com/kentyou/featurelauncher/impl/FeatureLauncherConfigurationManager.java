@@ -209,7 +209,7 @@ public class FeatureLauncherConfigurationManager implements ServiceTrackerCustom
 	private void updateConfigurationProperties(Object configurationObject, String featureConfigurationPid,
 			FeatureConfiguration featureConfiguration) {
 
-		Map<String, Object> configurationProperties = VariablesUtil.INSTANCE
+		Map<String, Object> configurationProperties = VariablesUtil
 				.maybeSubstituteVariables(featureConfiguration.getValues(), featureVariables);
 
 		try {

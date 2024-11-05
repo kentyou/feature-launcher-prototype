@@ -52,7 +52,7 @@ public class FrameworkLaunchingPropertiesFeatureExtensionHandlerImpl
 
 		Map<String, Object> rawProperties = DecorationContext.readFeatureExtensionJSON(extension.getJSON());
 
-		Map<String, Object> properties = VariablesUtil.INSTANCE.maybeSubstituteVariables(rawProperties,
+		Map<String, Object> properties = VariablesUtil.maybeSubstituteVariables(rawProperties,
 				feature.getVariables());
 
 		for (Map.Entry<String, Object> propertyEntry : properties.entrySet()) {

@@ -293,7 +293,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 				}
 			});
 
-			Map<String, Object> properties = VariablesUtil.INSTANCE.maybeSubstituteVariables(rawProperties,
+			Map<String, Object> properties = VariablesUtil.maybeSubstituteVariables(rawProperties,
 					mergeVariables());
 
 			return properties.entrySet().stream()
