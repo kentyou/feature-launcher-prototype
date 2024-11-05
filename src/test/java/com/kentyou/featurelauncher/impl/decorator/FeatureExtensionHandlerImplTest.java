@@ -40,7 +40,6 @@ import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
 import org.osgi.service.featurelauncher.decorator.DecoratorBuilderFactory;
 import org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler;
 
-import com.kentyou.featurelauncher.impl.util.DecorationUtil;
 import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
 
 /**
@@ -56,7 +55,7 @@ public class FeatureExtensionHandlerImplTest {
 
 	FeatureService featureService;
 	Feature feature;
-	DecorationUtil util;
+	DecorationContext util;
 
 	@BeforeEach
 	public void setUp() throws URISyntaxException, IOException {
@@ -64,7 +63,7 @@ public class FeatureExtensionHandlerImplTest {
 		featureService = ServiceLoaderUtil.loadFeatureService();
 		assertNotNull(featureService);
 
-		util = new DecorationUtil(List.of());
+		util = new DecorationContext(List.of());
 		
 		// Read feature
 		Path featureJSONPath = Paths

@@ -22,7 +22,6 @@ import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
 import org.osgi.service.featurelauncher.decorator.DecoratorBuilderFactory;
 import org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler;
 
-import com.kentyou.featurelauncher.impl.util.DecorationUtil;
 import com.kentyou.featurelauncher.impl.util.VariablesUtil;
 
 /**
@@ -51,7 +50,7 @@ public class FrameworkLaunchingPropertiesFeatureExtensionHandlerImpl
 			FeatureExtensionHandlerBuilder decoratedFeatureBuilder, DecoratorBuilderFactory factory)
 			throws AbandonOperationException {
 
-		Map<String, Object> rawProperties = DecorationUtil.readFeatureExtensionJSON(extension.getJSON());
+		Map<String, Object> rawProperties = DecorationContext.readFeatureExtensionJSON(extension.getJSON());
 
 		Map<String, Object> properties = VariablesUtil.INSTANCE.maybeSubstituteVariables(rawProperties,
 				feature.getVariables());

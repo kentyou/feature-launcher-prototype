@@ -56,9 +56,9 @@ import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.kentyou.featurelauncher.impl.decorator.DecorationContext;
 import com.kentyou.featurelauncher.impl.repository.ArtifactRepositoryFactoryImpl;
 import com.kentyou.featurelauncher.impl.util.BundleEventUtil;
-import com.kentyou.featurelauncher.impl.util.DecorationUtil;
 import com.kentyou.featurelauncher.impl.util.FileSystemUtil;
 import com.kentyou.featurelauncher.impl.util.FrameworkEventUtil;
 import com.kentyou.featurelauncher.impl.util.ServiceLoaderUtil;
@@ -109,7 +109,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 	}
 
 	class LaunchBuilderImpl implements LaunchBuilder {
-		private DecorationUtil decorationUtil;
+		private DecorationContext decorationUtil;
 		private Feature feature;
 		private boolean isLaunched;
 		private List<Bundle> installedBundles;
@@ -244,7 +244,7 @@ public class FeatureLauncherImpl extends ArtifactRepositoryFactoryImpl implement
 
 			this.isLaunched = true;
 			
-			decorationUtil = new DecorationUtil(this.artifactRepositories);
+			decorationUtil = new DecorationContext(this.artifactRepositories);
 
 			//////////////////////////////////////
 			// 160.4.3.1: Feature Decoration
