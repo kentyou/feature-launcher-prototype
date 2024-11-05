@@ -56,6 +56,7 @@ public class FeatureExtensionHandlerImplTest {
 
 	FeatureService featureService;
 	Feature feature;
+	DecorationUtil util;
 
 	@BeforeEach
 	public void setUp() throws URISyntaxException, IOException {
@@ -63,6 +64,8 @@ public class FeatureExtensionHandlerImplTest {
 		featureService = ServiceLoaderUtil.loadFeatureService();
 		assertNotNull(featureService);
 
+		util = new DecorationUtil();
+		
 		// Read feature
 		Path featureJSONPath = Paths
 				.get(getClass().getResource("/features/gogo-console-feature-with-dummy-extension.json").toURI());
@@ -104,7 +107,7 @@ public class FeatureExtensionHandlerImplTest {
 			}
 		};
 
-		Feature decoratedFeature = DecorationUtil.executeFeatureExtensionHandlers(featureService, feature,
+		Feature decoratedFeature = util.executeFeatureExtensionHandlers(featureService, feature,
 				Map.of(FEATURE_EXTENSION_NAME, featureBundlesExtensionHandler));
 		assertNotNull(decoratedFeature);
 
@@ -146,7 +149,7 @@ public class FeatureExtensionHandlerImplTest {
 			}
 		};
 
-		Feature decoratedFeature = DecorationUtil.executeFeatureExtensionHandlers(featureService, feature,
+		Feature decoratedFeature = util.executeFeatureExtensionHandlers(featureService, feature,
 				Map.of(FEATURE_EXTENSION_NAME, featureConfigurationsExtensionHandler));
 		assertNotNull(decoratedFeature);
 
@@ -184,7 +187,7 @@ public class FeatureExtensionHandlerImplTest {
 			}
 		};
 
-		Feature decoratedFeature = DecorationUtil.executeFeatureExtensionHandlers(featureService, feature,
+		Feature decoratedFeature = util.executeFeatureExtensionHandlers(featureService, feature,
 				Map.of(FEATURE_EXTENSION_NAME, featureVariablesExtensionHandler));
 		assertNotNull(decoratedFeature);
 
@@ -220,7 +223,7 @@ public class FeatureExtensionHandlerImplTest {
 			}
 		};
 
-		Feature decoratedFeature = DecorationUtil.executeFeatureExtensionHandlers(featureService, feature,
+		Feature decoratedFeature = util.executeFeatureExtensionHandlers(featureService, feature,
 				Map.of(FEATURE_EXTENSION_NAME, featureNoOpExtensionHandler));
 		assertNotNull(decoratedFeature);
 
@@ -259,7 +262,7 @@ public class FeatureExtensionHandlerImplTest {
 		};
 
 		assertThrows(AbandonOperationException.class,
-				() -> DecorationUtil.executeFeatureExtensionHandlers(featureService, feature,
+				() -> util.executeFeatureExtensionHandlers(featureService, feature,
 						Map.of(FEATURE_EXTENSION_NAME, featureInvalidExtensionHandler)));
 	}
 
@@ -269,7 +272,7 @@ public class FeatureExtensionHandlerImplTest {
 		assertEquals(1, featureExtensions.size());
 		assertEquals(FEATURE_EXTENSION_NAME, featureExtensions.get(FEATURE_EXTENSION_NAME).getName());
 
-		assertThrows(AbandonOperationException.class, () -> DecorationUtil
+		assertThrows(AbandonOperationException.class, () -> util
 				.executeFeatureExtensionHandlers(featureService, feature, Collections.emptyMap()));
 	}
 }

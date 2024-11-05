@@ -13,7 +13,6 @@
  */
 package com.kentyou.featurelauncher.impl.util;
 
-import static com.kentyou.featurelauncher.impl.decorator.FeatureDecorationConstants.DEFAULT_DECORATED_TYPE;
 import static org.osgi.service.featurelauncher.FeatureLauncherConstants.BUNDLE_START_LEVELS;
 import static org.osgi.service.featurelauncher.FeatureLauncherConstants.FRAMEWORK_LAUNCHING_PROPERTIES;
 import static org.osgi.service.featurelauncher.FeatureLauncherConstants.LAUNCH_FRAMEWORK;
@@ -22,15 +21,15 @@ import java.io.StringReader;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 import org.osgi.service.feature.Feature;
 import org.osgi.service.feature.FeatureExtension;
 import org.osgi.service.feature.FeatureService;
-import org.osgi.service.feature.ID;
 import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
 import org.osgi.service.featurelauncher.decorator.FeatureDecorator;
 import org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.kentyou.featurelauncher.impl.decorator.BundleStartLevelsFeatureExtensionHandlerImpl;
 import com.kentyou.featurelauncher.impl.decorator.DecoratorBuilderFactoryImpl;
@@ -55,73 +54,81 @@ import jakarta.json.JsonValue;
  */
 public class DecorationUtil {
 
+	private static final Logger LOG = LoggerFactory.getLogger(DecorationUtil.class);
+	
+	private final LaunchFrameworkFeatureExtensionHandlerImpl launchHandler = new LaunchFrameworkFeatureExtensionHandlerImpl();
+	private final FrameworkLaunchingPropertiesFeatureExtensionHandlerImpl frameworkHandler = new FrameworkLaunchingPropertiesFeatureExtensionHandlerImpl();
+	private final BundleStartLevelsFeatureExtensionHandlerImpl startLevelHandler = new BundleStartLevelsFeatureExtensionHandlerImpl();
+	
 	// @formatter:off
-	private static final Map<String, FeatureExtensionHandler> EXTENSION_TO_BUILTIN_HANDLER_MAP = Map.ofEntries(
-			Map.entry(LAUNCH_FRAMEWORK, new LaunchFrameworkFeatureExtensionHandlerImpl()),
-			Map.entry(FRAMEWORK_LAUNCHING_PROPERTIES, new FrameworkLaunchingPropertiesFeatureExtensionHandlerImpl()),
-			Map.entry(BUNDLE_START_LEVELS, new BundleStartLevelsFeatureExtensionHandlerImpl()));
+	private final Map<String, FeatureExtensionHandler> handlers = Map.ofEntries(
+			Map.entry(LAUNCH_FRAMEWORK, launchHandler),
+			Map.entry(FRAMEWORK_LAUNCHING_PROPERTIES, frameworkHandler),
+			Map.entry(BUNDLE_START_LEVELS, startLevelHandler));
 	// @formatter:on
 
-	private DecorationUtil() {
-		// hidden constructor
+	public LaunchFrameworkFeatureExtensionHandlerImpl getLaunchHandler() {
+		return launchHandler;
 	}
 
-	public static Feature executeFeatureDecorators(FeatureService featureService, Feature feature,
+	public FrameworkLaunchingPropertiesFeatureExtensionHandlerImpl getFrameworkHandler() {
+		return frameworkHandler;
+	}
+
+	public BundleStartLevelsFeatureExtensionHandlerImpl getStartLevelHandler() {
+		return startLevelHandler;
+	}
+
+	public Feature executeFeatureDecorators(FeatureService featureService, Feature feature,
 			List<FeatureDecorator> decorators) throws AbandonOperationException {
-		Feature originalFeature = feature;
+
+		Feature updatedFeature = feature;
 
 		for (FeatureDecorator decorator : decorators) {
-			feature = decorator.decorate(feature, new FeatureDecoratorBuilderImpl(featureService, feature),
+			Feature loopFeature = updatedFeature;
+			FeatureDecoratorBuilderImpl decoratedFeatureBuilder = new FeatureDecoratorBuilderImpl(featureService, feature);
+			updatedFeature = decorator.decorate(feature, decoratedFeatureBuilder,
 					new DecoratorBuilderFactoryImpl(featureService));
+			enforceValidFeature(loopFeature, updatedFeature, decoratedFeatureBuilder.getBuilt());
 		}
 
-		enforceValidFeature(originalFeature, feature);
-
-		return feature;
+		return updatedFeature;
 	}
 
-	public static Feature executeFeatureExtensionHandlers(FeatureService featureService, Feature feature,
+	public Feature executeFeatureExtensionHandlers(FeatureService featureService, final Feature feature,
 			Map<String, FeatureExtensionHandler> extensionHandlers) throws AbandonOperationException {
-		Feature originalFeature = feature;
+		Map<String, FeatureExtensionHandler> toUse = new HashMap<String, FeatureExtensionHandler>(extensionHandlers);
+		
+		handlers.entrySet().forEach(e -> {
+			String extension = e.getKey();
+			if(toUse.containsKey(extension)) {
+				LOG.warn("The extension handler {} is provided by the implementation and may not be overridden.", extension);
+			}
+			toUse.put(extension, e.getValue());
+		});
+		
+		Feature updatedFeature = feature;
 
 		for (Map.Entry<String, FeatureExtension> featureExtensionEntry : feature.getExtensions().entrySet()) {
+			Feature loopFeature = updatedFeature;
 			String extensionName = featureExtensionEntry.getKey();
 			FeatureExtension featureExtension = featureExtensionEntry.getValue();
 
-			FeatureExtensionHandler handlerForExtension = extensionHandlers.get(extensionName);
-			if (handlerForExtension == null) {
-				handlerForExtension = getBuiltInHandlerForExtension(extensionName);
-			}
+			FeatureExtensionHandler handlerForExtension = toUse.get(extensionName);
 
 			if (handlerForExtension != null) {
-				feature = handlerForExtension.handle(feature, featureExtension,
-						new FeatureExtensionHandlerBuilderImpl(featureService, feature),
-						new DecoratorBuilderFactoryImpl(featureService));
+				FeatureExtensionHandlerBuilderImpl decoratedFeatureBuilder = new FeatureExtensionHandlerBuilderImpl(featureService, feature);
+				updatedFeature = handlerForExtension.handle(feature, featureExtension,
+						decoratedFeatureBuilder, new DecoratorBuilderFactoryImpl(featureService));
 
+				enforceValidFeature(loopFeature, updatedFeature, decoratedFeatureBuilder.getBuilt());
 			} else if (isExtensionMandatory(featureExtension)) {
 				throw new AbandonOperationException(String
 						.format("Feature extension handler for mandatory extension %s not found!", extensionName));
 			}
 		}
 
-		enforceValidFeature(originalFeature, feature);
-
-		return feature;
-	}
-
-	public static <T extends FeatureExtensionHandler> T getBuiltInHandlerForExtension(String extensionName)
-			throws AbandonOperationException {
-		Objects.requireNonNull(extensionName, "Feature extension name cannot be null!");
-
-		@SuppressWarnings("unchecked")
-		T handlerForExtension = (T) EXTENSION_TO_BUILTIN_HANDLER_MAP.get(extensionName);
-
-		if (handlerForExtension != null) {
-			return handlerForExtension;
-		} else {
-			throw new AbandonOperationException(
-					String.format("Built-in feature extension handler for extension %s not found!", extensionName));
-		}
+		return updatedFeature;
 	}
 
 	public static boolean isExtensionMandatory(FeatureExtension featureExtension) {
@@ -183,41 +190,11 @@ public class DecorationUtil {
 		}
 	}
 
-	private static void enforceValidFeature(Feature originalFeature, Feature returnedFeature)
+	private static void enforceValidFeature(Feature originalFeature, Feature returnedFeature, Feature builtFeature)
 			throws AbandonOperationException {
-		if (!((originalFeature == returnedFeature) || idMatches(originalFeature.getID(), returnedFeature.getID()))) {
+		if (!((originalFeature == returnedFeature) || (builtFeature == returnedFeature))) {
 			throw new AbandonOperationException(
 					"The feature returned by the decorator was not the original, or one created by the supplied builder");
 		}
-	}
-
-	/*
-	 * All data in the original feature can be replaced, except for ID, excluding
-	 * classifier, therefore all the other parts of ID must match or default to
-	 * those used internally.
-	 * 
-	 * See {@link com.kentyou.featurelauncher.impl.decorator.
-	 * AbstractBaseFeatureDecorationBuilder.prebuild()}
-	 */
-	private static boolean idMatches(ID originalFeatureId, ID returnedFeatureId) {
-		boolean groupIdMatches = originalFeatureId.getGroupId().equals(returnedFeatureId.getGroupId());
-
-		boolean artifactIdMatches = originalFeatureId.getArtifactId().equals(returnedFeatureId.getArtifactId());
-
-		boolean versionMatches = originalFeatureId.getVersion().equals(returnedFeatureId.getVersion());
-
-		/**
-		 * this check is necessitated by contract and implementation of
-		 * {@link org.osgi.service.feature.FeatureService} which requires specifying
-		 * type if classifier is specified as well, therefore if type was initially
-		 * empty, it can no longer be empty and default type is used - see
-		 * {@link com.kentyou.featurelauncher.impl.decorator.AbstractBaseFeatureDecorationBuilder.prebuild()}
-		 **/
-		boolean typeMatches = (originalFeatureId.getType().isPresent() && returnedFeatureId.getType().isPresent()
-				&& originalFeatureId.getType().get().equals(returnedFeatureId.getType().get()))
-				|| (originalFeatureId.getType().isEmpty() && returnedFeatureId.getType().isPresent()
-						&& DEFAULT_DECORATED_TYPE.equals(returnedFeatureId.getType().get()));
-
-		return groupIdMatches && artifactIdMatches && versionMatches && typeMatches;
 	}
 }

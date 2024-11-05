@@ -22,12 +22,9 @@ import java.util.ServiceLoader;
 
 import org.osgi.framework.launch.FrameworkFactory;
 import org.osgi.service.feature.Feature;
-import org.osgi.service.feature.FeatureExtension;
 import org.osgi.service.featurelauncher.LaunchException;
-import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
 import org.osgi.service.featurelauncher.repository.ArtifactRepository;
 
-import com.kentyou.featurelauncher.impl.decorator.LaunchFrameworkFeatureExtensionHandler;
 import com.kentyou.featurelauncher.impl.util.DecorationUtil;
 
 /**
@@ -40,7 +37,7 @@ class FrameworkFactoryLocator {
 	static final int FIND_FRAMEWORK_CALLER_CLASS_SKIP = 4;
 
 	public static FrameworkFactory locateFrameworkFactory(Feature feature,
-			List<ArtifactRepository> artifactRepositories) {
+			DecorationUtil decorationUtil, List<ArtifactRepository> artifactRepositories) {
 		/*
 		 * TODO: "160.4.3.2: #1. If any provider specific configuration has been given
 		 * to the Feature Launcher implementation then this should be used to identify
@@ -54,7 +51,7 @@ class FrameworkFactoryLocator {
 		 * Selecting a framework implementation on page 99"
 		 */
 		Optional<FrameworkFactory> selectFrameworkFactoryOptional = selectFrameworkFactory(feature,
-				artifactRepositories);
+				decorationUtil, artifactRepositories);
 		if (selectFrameworkFactoryOptional.isPresent()) {
 			return selectFrameworkFactoryOptional.get();
 		}
@@ -86,30 +83,10 @@ class FrameworkFactoryLocator {
 	}
 
 	private static Optional<FrameworkFactory> selectFrameworkFactory(Feature feature,
-			List<ArtifactRepository> artifactRepositories) {
-		Optional<FrameworkFactory> selectFrameworkFactoryOptional = Optional.empty();
-
-		if (DecorationUtil.hasLaunchFrameworkFeatureExtension(feature.getExtensions())) {
-			LaunchFrameworkFeatureExtensionHandler launchFrameworkFeatureExtensionHandler;
-			try {
-				launchFrameworkFeatureExtensionHandler = DecorationUtil
-						.getBuiltInHandlerForExtension(LAUNCH_FRAMEWORK);
-			} catch (AbandonOperationException e) {
-				throw new LaunchException(e.getMessage(), e);
-			}
-
-			FeatureExtension launchFrameworkFeatureExtension = feature.getExtensions().get(LAUNCH_FRAMEWORK);
-
-			selectFrameworkFactoryOptional = launchFrameworkFeatureExtensionHandler.selectFrameworkFactory(
-					launchFrameworkFeatureExtension, artifactRepositories, loadDefaultFrameworkFactory());
-
-			if (selectFrameworkFactoryOptional.isEmpty()
-					&& DecorationUtil.isExtensionMandatory(launchFrameworkFeatureExtension)) {
-				throw new LaunchException("No suitable OSGi framework implementation could be selected!");
-			}
-		}
-
-		return selectFrameworkFactoryOptional;
+			DecorationUtil decorationUtil, List<ArtifactRepository> artifactRepositories) {
+		return decorationUtil.getLaunchHandler()
+				.selectFrameworkFactory(feature.getExtensions().get(LAUNCH_FRAMEWORK),
+						artifactRepositories, loadDefaultFrameworkFactory());
 	}
 
 	private static Optional<FrameworkFactory> findFrameworkFactory() {

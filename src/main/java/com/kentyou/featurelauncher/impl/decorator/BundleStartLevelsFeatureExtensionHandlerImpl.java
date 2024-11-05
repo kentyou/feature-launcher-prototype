@@ -17,11 +17,13 @@ import static com.kentyou.featurelauncher.impl.decorator.FeatureDecorationConsta
 import static com.kentyou.featurelauncher.impl.decorator.FeatureDecorationConstants.BUNDLE_START_LEVELS_MINIMUM;
 
 import java.util.Map;
+import java.util.OptionalInt;
 
 import org.osgi.service.feature.Feature;
 import org.osgi.service.feature.FeatureExtension;
 import org.osgi.service.featurelauncher.decorator.AbandonOperationException;
 import org.osgi.service.featurelauncher.decorator.DecoratorBuilderFactory;
+import org.osgi.service.featurelauncher.decorator.FeatureExtensionHandler;
 
 import com.kentyou.featurelauncher.impl.util.DecorationUtil;
 
@@ -32,7 +34,7 @@ import com.kentyou.featurelauncher.impl.util.DecorationUtil;
  * @author Michael H. Siemaszko (mhs@into.software)
  * @since Oct 19, 2024
  */
-public class BundleStartLevelsFeatureExtensionHandlerImpl implements BundleStartLevelsFeatureExtensionHandler {
+public class BundleStartLevelsFeatureExtensionHandlerImpl implements FeatureExtensionHandler {
 
 	private Integer defaultBundleStartLevel;
 
@@ -79,39 +81,11 @@ public class BundleStartLevelsFeatureExtensionHandlerImpl implements BundleStart
 		return feature;
 	}
 
-	/* 
-	 * (non-Javadoc)
-	 * @see com.kentyou.featurelauncher.impl.decorator.BundleStartLevelsFeatureExtensionHandler#hasDefaultBundleStartLevel()
-	 */
-	@Override
-	public boolean hasDefaultBundleStartLevel() {
-		return (defaultBundleStartLevel != null);
+	public OptionalInt getDefaultBundleStartLevel() {
+		return defaultBundleStartLevel == null ? OptionalInt.empty() : OptionalInt.of(defaultBundleStartLevel);
 	}
 
-	/* 
-	 * (non-Javadoc)
-	 * @see com.kentyou.featurelauncher.impl.decorator.BundleStartLevelsFeatureExtensionHandler#getDefaultBundleStartLevel()
-	 */
-	@Override
-	public Integer getDefaultBundleStartLevel() {
-		return defaultBundleStartLevel;
-	}
-
-	/* 
-	 * (non-Javadoc)
-	 * @see com.kentyou.featurelauncher.impl.decorator.BundleStartLevelsFeatureExtensionHandler#hasMinimumFrameworkStartLevel()
-	 */
-	@Override
-	public boolean hasMinimumFrameworkStartLevel() {
-		return (minimumFrameworkStartLevel != null);
-	}
-
-	/* 
-	 * (non-Javadoc)
-	 * @see com.kentyou.featurelauncher.impl.decorator.BundleStartLevelsFeatureExtensionHandler#getMinimumFrameworkStartLevel()
-	 */
-	@Override
-	public Integer getMinimumFrameworkStartLevel() {
-		return minimumFrameworkStartLevel;
+	public OptionalInt getMinimumFrameworkStartLevel() {
+		return minimumFrameworkStartLevel == null ? OptionalInt.empty() : OptionalInt.of(minimumFrameworkStartLevel);
 	}
 }

@@ -18,9 +18,9 @@
 			"kind": "mandatory",
 			"type": "json",
 			"json": {
-				"defaultStartLevel": 2,
+				"defaultStartLevel": 4,
 				// The default start level to use for bundles in this feature; com.kentyou.featurelauncher.impl.decorator.FeatureDecorationConstants.BUNDLE_START_LEVELS_DEFAULT
-				"minimumStartLevel": 1				// The minimum required framework start level after installing this feature; com.kentyou.featurelauncher.impl.decorator.FeatureDecorationConstants.BUNDLE_START_LEVELS_MINIMUM
+				"minimumStartLevel": 7				// The minimum required framework start level after installing this feature; com.kentyou.featurelauncher.impl.decorator.FeatureDecorationConstants.BUNDLE_START_LEVELS_MINIMUM
 
 			}
 		}

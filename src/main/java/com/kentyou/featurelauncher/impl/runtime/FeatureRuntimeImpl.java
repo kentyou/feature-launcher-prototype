@@ -252,6 +252,7 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 	}
 
 	abstract class AbstractOperationBuilderImpl<T extends OperationBuilder<T>> implements OperationBuilder<T> {
+		protected final DecorationUtil decorationUtil = new DecorationUtil();
 		protected Feature feature;
 		protected boolean isCompleted;
 		protected boolean useDefaultRepositories;
@@ -426,9 +427,9 @@ public class FeatureRuntimeImpl extends ArtifactRepositoryFactoryImpl implements
 			// Feature Decoration
 			Feature originalFeature = feature;
 			try {
-				feature = DecorationUtil.executeFeatureDecorators(featureService, feature, decorators);
+				feature = decorationUtil.executeFeatureDecorators(featureService, feature, decorators);
 
-				feature = DecorationUtil.executeFeatureExtensionHandlers(featureService, feature, extensionHandlers);
+				feature = decorationUtil.executeFeatureExtensionHandlers(featureService, feature, extensionHandlers);
 			} catch (AbandonOperationException e) {
 				throw new FeatureRuntimeException("Feature decoration handling failed!", e);
 			}
